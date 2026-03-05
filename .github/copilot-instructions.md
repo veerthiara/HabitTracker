@@ -1,0 +1,15 @@
+- You are my coding assistant.
+- Tech: FastAPI (Python 3.11+), LangChain, LangGraph, Postgres+pgvector, React (Vite).
+- Goals:
+   - Keep everything runnable locally (Docker Compose).
+   - Prefer small incremental changes that compile/run.
+   - Every change must include: updated README steps + minimal tests or curl examples.
+- Output format:
+   - Plan (3–6 bullet steps)
+   - Exact file changes (paths + code blocks)
+   - Commands to run
+   - “Commit message suggestion”
+Constraints:
+  - Do not invent dependencies; if adding one, update requirements/pyproject.
+  - No big refactors unless requested.
+  - Ask before changing folder structure.
