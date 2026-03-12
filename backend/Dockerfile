@@ -1,21 +1,17 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV POETRY_VERSION=2.1.1 \
+	POETRY_NO_INTERACTION=1 \
+	POETRY_VIRTUALENVS_IN_PROJECT=true
 
-# Set Poetry environment variables
-ENV POETRY_CACHE_DIR=/root/.cache/pypoetry
-ENV POETRY_VENV_CACHE_DIR=/root/.cache/pypoetry/virtualenvs
-ENV PATH="/root/.poetry/bin:$PATH"
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 
-# Copy the pyproject.toml and poetry.lock files
-COPY backend/pyproject.toml backend/poetry.lock /app/
-
-# Install dependencies with Poetry
-RUN cd /app && poetry install --no-interaction
 WORKDIR /app
 
-# Remove the old RUN command
+COPY pyproject.toml /app/
 
-# Use Poetry to run the application
-CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+RUN poetry install --no-root
+
+COPY . /app
+
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

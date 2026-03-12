@@ -9,3 +9,8 @@ def read_root():
 @app.get("/health")
 def read_health():
     return {"status": "ok"}
+
+# Add another health endpoint for ready status
+@app.get("/ready")
+def read_ready():
+    return {"status": "ready"}
