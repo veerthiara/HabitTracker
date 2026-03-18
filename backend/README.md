@@ -7,6 +7,17 @@ FastAPI backend for the `langchain-pgvector` monorepo.
 - Python 3.11+
 - Poetry
 
+## Local database
+
+Start local PostgreSQL from the infrastructure folder before running migration-related backend work:
+
+```bash
+cp infra/local/.env.example infra/local/.env
+make local-db-up
+```
+
+Infra documentation is available at `infra/local/README.md`.
+
 ## Local-only files
 
 - `.venv/` is the Poetry virtual environment for this service.

@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check
 
 backend-install:
 	cd backend && poetry install
@@ -23,3 +23,18 @@ client-run:
 
 client-build:
 	cd client && npm run build
+
+local-db-up:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up -d
+
+local-db-down:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down
+
+local-db-logs:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml logs -f postgres
+
+local-db-ps:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml ps
+
+local-db-check:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec postgres sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT 1;"'
