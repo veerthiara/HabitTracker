@@ -7,3 +7,8 @@
 __pycache__/
 backend/.env
 backend/.venv/
+client/node_modules/
+client/dist/
+client/.env
+client/*.tsbuildinfo
+

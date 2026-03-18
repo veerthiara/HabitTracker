@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build
 
 backend-install:
 	cd backend && poetry install
@@ -14,3 +14,12 @@ backend-docker-up:
 
 backend-docker-down:
 	docker compose down
+
+client-install:
+	cd client && npm install
+
+client-run:
+	cd client && npm run dev
+
+client-build:
+	cd client && npm run build
