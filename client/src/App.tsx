@@ -1,36 +1,20 @@
-import { useState } from "react";
-import { apiBaseUrl, fetchBackendRoot } from "./api";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell";
+import { DashboardPage } from "./pages/Dashboard/DashboardPage";
+import { HabitsPage } from "./pages/Habits/HabitsPage";
+import { HydrationPage } from "./pages/Hydration/HydrationPage";
+import { NotesPage } from "./pages/Notes/NotesPage";
 
-type RequestState = "idle" | "loading" | "success" | "error";
-
-function App() {
-  const [state, setState] = useState<RequestState>("idle");
-  const [message, setMessage] = useState("No response yet");
-
-  async function handleCallBackend() {
-    setState("loading");
-
-    try {
-      const payload = await fetchBackendRoot();
-      setMessage(payload.message);
-      setState("success");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unknown error");
-      setState("error");
-    }
-  }
-
+export default function App() {
   return (
-    <main className="container">
-      <h1>Minimal Client</h1>
-      <p>API base: {apiBaseUrl}</p>
-      <button type="button" onClick={handleCallBackend} disabled={state === "loading"}>
-        {state === "loading" ? "Calling backend..." : "Call backend /"}
-      </button>
-      <p>Status: {state}</p>
-      <pre>{message}</pre>
-    </main>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="habits" element={<HabitsPage />} />
+        <Route path="hydration" element={<HydrationPage />} />
+        <Route path="notes" element={<NotesPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }
-
-export default App;
