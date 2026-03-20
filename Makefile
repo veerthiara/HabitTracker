@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes
 
 backend-install:
 	cd backend && poetry install
@@ -30,6 +30,13 @@ local-db-up:
 local-db-down:
 	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down
 
+# ⚠️  Destroys and recreates the volume — all data is lost.
+# Required when switching the Postgres image (e.g. to pgvector/pgvector:pg16).
+# After running: make db-migrate && make db-seed
+local-db-reset:
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml down -v
+	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up -d
+
 local-db-logs:
 	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml logs -f postgres
 
@@ -54,3 +61,6 @@ db-history:
 
 db-seed:
 	cd backend && poetry run python -m scripts.seed.main
+
+embed-notes:
+	cd backend && poetry run python -m scripts.embed.main
