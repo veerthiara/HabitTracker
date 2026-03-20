@@ -1,0 +1,172 @@
+.content {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.progressCard,
+.addCard {
+  width: 100%;
+}
+
+.statsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-3);
+}
+
+.totalLabel {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.pctLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.barTrack {
+  height: 12px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.5s ease;
+}
+
+.barLow    { background: var(--color-danger,  #ef4444); }
+.barWarning { background: var(--color-warning, #f59e0b); }
+.barGood   { background: var(--color-accent,  #6366f1); }
+.barFull   { background: #22c55e; }
+
+/* quick buttons */
+.quickRow {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.quickBtn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.quickBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.quickBtnActive {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+/* inline form */
+.formRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.inputLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+/* event list */
+.eventList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.eventItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: background 0.15s;
+}
+
+.eventItem:hover {
+  background: var(--color-bg-hover, rgba(255,255,255,0.04));
+}
+
+.eventTime {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 54px;
+}
+
+.eventVolume {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  min-width: 60px;
+}
+
+.eventNote {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+  margin-left: auto;
+}
+
+.deleteBtn:hover {
+  opacity: 1;
+  color: var(--color-danger, #ef4444);
+}

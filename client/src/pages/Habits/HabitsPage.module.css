@@ -1,0 +1,14 @@
+.content {
+  padding: var(--space-6);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-5);
+}
+
+.error {
+  color: var(--color-danger, #ef4444);
+  font-size: var(--text-sm);
+}
