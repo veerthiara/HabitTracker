@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history
 
 backend-install:
 	cd backend && poetry install
@@ -38,3 +38,16 @@ local-db-ps:
 
 local-db-check:
 	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml exec postgres sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT 1;"'
+
+# Alembic migration targets (require local DB to be running and DATABASE_URL set in infra/local/.env)
+db-migrate:
+	cd backend && poetry run alembic upgrade head
+
+db-downgrade:
+	cd backend && poetry run alembic downgrade -1
+
+db-revision:
+	cd backend && poetry run alembic revision --autogenerate -m "$(msg)"
+
+db-history:
+	cd backend && poetry run alembic history --verbose

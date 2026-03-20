@@ -71,3 +71,61 @@ Stop the container:
 ```bash
 make backend-docker-down
 ```
+
+## Project layout
+
+```
+backend/
+  habittracker/               ← application package
+    models/
+      orm/
+        base.py               ← DeclarativeBase (single source of truth)
+        __init__.py           ← imports + re-exports all ORM models
+        habittracker/         ← one file per domain model
+          user.py
+          habit.py
+          habit_log.py
+          bottle_event.py
+          note.py
+          daily_summary.py
+  alembic/                    ← Alembic env + migration versions
+    env.py
+    versions/
+  alembic.ini
+  main.py
+```
+
+## Database migrations (Alembic)
+
+Alembic is configured in `alembic.ini`. All commands are run from the
+`backend/` directory (the Makefile `cd backend &&` prefix handles this).
+
+### Apply all pending migrations
+
+```bash
+make db-migrate
+```
+
+### Roll back one migration
+
+```bash
+make db-downgrade
+```
+
+### Generate a new migration from model changes
+
+```bash
+make db-revision msg="describe what changed"
+```
+
+### View migration history
+
+```bash
+make db-history
+```
+
+### How autogenerate picks up models
+
+`alembic/env.py` imports `Base` from `habittracker.models.orm`, which in
+turn imports every model file so they register themselves with
+`Base.metadata` before Alembic inspects it.
