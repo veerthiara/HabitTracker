@@ -129,3 +129,33 @@ make db-history
 `alembic/env.py` imports `Base` from `habittracker.models.orm`, which in
 turn imports every model file so they register themselves with
 `Base.metadata` before Alembic inspects it.
+
+## Seed data (local dev only)
+
+The seed script inserts a fixed set of demo rows using deterministic UUIDs
+and `ON CONFLICT DO NOTHING`, so it is fully idempotent — running it
+multiple times is safe and will never duplicate data.
+
+```bash
+# 1. Make sure the DB is running and migrations are applied first:
+make local-db-up
+make db-migrate
+
+# 2. Run the seed:
+make db-seed
+```
+
+Demo data created:
+
+| Table | Rows |
+|---|---|
+| `users` | 1 demo user (`00000000-…-0001`) |
+| `habits` | 3 habits (Morning run, Read 30 min, Meditate) |
+| `habit_logs` | 14 logs (2 habits × 7 days) |
+| `bottle_events` | 3 hydration events for today |
+| `notes` | 2 manual notes |
+
+Seed modules live in `backend/scripts/seed/`. Each module exports a
+`seed(session)` function that is called by the orchestrator
+`scripts/seed/main.py`. To add more seed data, add a new module and
+register it in `main.py`.

@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed
 
 backend-install:
 	cd backend && poetry install
@@ -51,3 +51,6 @@ db-revision:
 
 db-history:
 	cd backend && poetry run alembic history --verbose
+
+db-seed:
+	cd backend && poetry run python -m scripts.seed.main
