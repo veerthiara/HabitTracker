@@ -1,16 +1,8 @@
-from fastapi import FastAPI
+import uvicorn
 
-app = FastAPI()
+from habittracker.server import create_application
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello World"}
+app = create_application()
 
-@app.get("/health")
-def read_health():
-    return {"status": "ok"}
-
-# Add another health endpoint for ready status
-@app.get("/ready")
-def read_ready():
-    return {"status": "ready"}
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
