@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed
 
 backend-install:
 	cd backend && poetry install
@@ -64,3 +64,6 @@ db-seed:
 
 embed-notes:
 	cd backend && poetry run python -m scripts.embed.main
+
+test-embed:
+	cd backend && poetry run pytest tests/scripts/embed/ -v
