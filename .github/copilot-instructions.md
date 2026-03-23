@@ -13,6 +13,8 @@ Documentation naming convention:
 - `docs/implementation/phase-02-rev01.md`
 - `docs/implementation/phase-02-rev02.md`
 
+Ensure documentation is always updated for each phase/revision with the same title and content structure as the example in `docs/implementation/phase-04-rev01.md`.
+
 ## Working style
 - Continue coding normally unless explicitly told to stop.
 - Prefer small, focused changes that match the current phase and revision.

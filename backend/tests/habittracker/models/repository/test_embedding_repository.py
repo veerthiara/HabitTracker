@@ -10,17 +10,21 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from habittracker.models.repository.embedding_repository import NoteRow, fetch_unembedded_notes, vector_to_literal
-
+from habittracker.models.repository.embedding_repository import (
+    NoteRow,
+    fetch_unembedded_notes,
+    vector_to_literal,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-@pytest.fixture()
+@pytest.fixture
 def sqlite_session():
     """Provide a minimal in-memory SQLite session with a notes-like table.
 
     Note: SQLite does not have the vector type, so update_note_embedding
-    cannot be tested here. That path is exercised by test_service.py via mocks.
+    cannot be tested here. That path is exercised via mocks in
+    tests/habittracker/services/test_embedding_service.py.
     """
     engine = create_engine("sqlite:///:memory:")
     with engine.connect() as conn:
