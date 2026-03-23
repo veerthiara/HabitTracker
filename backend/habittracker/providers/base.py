@@ -1,7 +1,7 @@
 """Abstract base class for embedding providers.
 
 Any embedding backend (Ollama, OpenAI, HuggingFace, etc.) must implement
-this interface. The pipeline (service.py) depends only on this abstraction,
+this interface. The pipeline and API depend only on this abstraction,
 making providers fully swappable without touching any other code.
 """
 

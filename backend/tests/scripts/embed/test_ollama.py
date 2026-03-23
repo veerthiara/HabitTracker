@@ -1,4 +1,4 @@
-"""Tests for scripts.embed.providers.ollama.
+"""Tests for habittracker.providers.ollama.
 
 All tests mock httpx so no real Ollama server is needed.
 """
@@ -7,8 +7,8 @@ import pytest
 import httpx
 from unittest.mock import MagicMock, patch
 
-from scripts.embed.providers.base import EmbeddingError
-from scripts.embed.providers.ollama import OllamaProvider
+from habittracker.providers.base import EmbeddingError
+from habittracker.providers.ollama import OllamaProvider
 
 _FAKE_VECTOR = [0.1] * 768
 

@@ -14,13 +14,13 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from scripts.embed.config import EMBED_BATCH_SIZE, EMBED_EXPECTED_DIMS
-from scripts.embed.providers.base import EmbeddingError, EmbeddingProvider
-from scripts.embed.repository import (
+from habittracker.core.config import EMBED_BATCH_SIZE, EMBED_EXPECTED_DIMS
+from habittracker.models.repository.embedding_repository import (
     NoteRow,
     fetch_unembedded_notes,
     update_note_embedding,
 )
+from habittracker.providers.base import EmbeddingError, EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 

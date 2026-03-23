@@ -1,4 +1,4 @@
-"""Tests for scripts.embed.repository.
+"""Tests for habittracker.models.repository.embedding_repository.
 
 Uses an in-memory SQLite database — no Postgres or migrations required.
 The tests cover the helper functions directly, not end-to-end behaviour.
@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from scripts.embed.repository import NoteRow, fetch_unembedded_notes, vector_to_literal
+from habittracker.models.repository.embedding_repository import NoteRow, fetch_unembedded_notes, vector_to_literal
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

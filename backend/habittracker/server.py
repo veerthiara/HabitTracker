@@ -13,6 +13,7 @@ from habittracker.api.v1 import (
     habit_logs,
     habits,
     notes,
+    search,
 )
 
 
@@ -40,6 +41,7 @@ def create_application() -> FastAPI:
     app.include_router(habit_logs.router, prefix=v1_prefix)
     app.include_router(bottle_events.router, prefix=v1_prefix)
     app.include_router(notes.router, prefix=v1_prefix)
+    app.include_router(search.router, prefix=v1_prefix)
     app.include_router(dashboard.router, prefix=v1_prefix)
 
     return app

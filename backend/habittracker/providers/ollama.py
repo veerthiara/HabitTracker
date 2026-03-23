@@ -1,7 +1,7 @@
 """Ollama embedding provider.
 
 Calls the local Ollama server's /api/embeddings endpoint.
-Configuration is read from scripts.embed.config — no hardcoded values here.
+Configuration is read from habittracker.core.config — no hardcoded values here.
 
 Retries:
     Transient HTTP failures are retried up to OLLAMA_MAX_RETRIES times with
@@ -13,7 +13,7 @@ import time
 
 import httpx
 
-from scripts.embed.config import (
+from habittracker.core.config import (
     EMBED_EXPECTED_DIMS,
     OLLAMA_BASE_URL,
     OLLAMA_EMBED_MODEL,
@@ -21,7 +21,7 @@ from scripts.embed.config import (
     OLLAMA_RETRY_BACKOFF_SEC,
     OLLAMA_TIMEOUT_SEC,
 )
-from scripts.embed.providers.base import EmbeddingError, EmbeddingProvider
+from habittracker.providers.base import EmbeddingError, EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 

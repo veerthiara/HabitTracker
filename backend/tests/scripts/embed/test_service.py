@@ -1,4 +1,4 @@
-"""Tests for scripts.embed.service.
+"""Tests for habittracker.services.embedding_service.
 
 All external dependencies (DB session, embedding provider) are mocked
 so tests run without Postgres or Ollama.
@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from scripts.embed.providers.base import EmbeddingError, EmbeddingProvider
-from scripts.embed.repository import NoteRow
-from scripts.embed.service import EmbedResult, embed_notes
+from habittracker.providers.base import EmbeddingError, EmbeddingProvider
+from habittracker.models.repository.embedding_repository import NoteRow
+from habittracker.services.embedding_service import EmbedResult, embed_notes
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ class TestEmbedNotesBasic:
     def test_no_notes_returns_zero_counts(self) -> None:
         session = _make_session()
         provider = _make_provider()
-        with patch("scripts.embed.service.fetch_unembedded_notes", return_value=[]):
+        with patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=[]):
             result = embed_notes(session, provider)
         assert result.processed == 0
         assert result.errors == 0
@@ -48,7 +48,7 @@ class TestEmbedNotesBasic:
     def test_no_notes_success_is_true(self) -> None:
         session = _make_session()
         provider = _make_provider()
-        with patch("scripts.embed.service.fetch_unembedded_notes", return_value=[]):
+        with patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=[]):
             result = embed_notes(session, provider)
         assert result.success is True
 
@@ -57,8 +57,8 @@ class TestEmbedNotesBasic:
         provider = _make_provider(dims=768)
         notes = [_make_note()]
         with (
-            patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes),
-            patch("scripts.embed.service.update_note_embedding") as mock_update,
+            patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes),
+            patch("habittracker.services.embedding_service.update_note_embedding") as mock_update,
         ):
             result = embed_notes(session, provider, expected_dims=768)
         assert result.processed == 1
@@ -70,8 +70,8 @@ class TestEmbedNotesBasic:
         provider = _make_provider(dims=3)
         notes = [_make_note() for _ in range(6)]
         with (
-            patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes),
-            patch("scripts.embed.service.update_note_embedding"),
+            patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes),
+            patch("habittracker.services.embedding_service.update_note_embedding"),
         ):
             embed_notes(session, provider, batch_size=2, expected_dims=3, inter_batch_delay=0)
         # 6 notes / batch_size 2 → 3 commits
@@ -86,7 +86,7 @@ class TestEmbedNotesErrors:
         provider = _make_provider()
         provider.embed.side_effect = EmbeddingError("ollama down")
         notes = [_make_note()]
-        with patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes):
+        with patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes):
             result = embed_notes(session, provider, expected_dims=768)
         assert result.errors == 1
         assert result.processed == 0
@@ -97,7 +97,7 @@ class TestEmbedNotesErrors:
         note = _make_note()
         provider = _make_provider()
         provider.embed.side_effect = EmbeddingError("fail")
-        with patch("scripts.embed.service.fetch_unembedded_notes", return_value=[note]):
+        with patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=[note]):
             result = embed_notes(session, provider, expected_dims=768)
         assert str(note.id) in result.error_ids
 
@@ -111,8 +111,8 @@ class TestEmbedNotesErrors:
             [0.1] * 768,
         ]
         with (
-            patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes),
-            patch("scripts.embed.service.update_note_embedding"),
+            patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes),
+            patch("habittracker.services.embedding_service.update_note_embedding"),
         ):
             result = embed_notes(session, provider, expected_dims=768)
         assert result.processed == 2
@@ -127,8 +127,8 @@ class TestDimensionValidation:
         provider = _make_provider(dims=512)  # returns 512 but we expect 768
         notes = [_make_note()]
         with (
-            patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes),
-            patch("scripts.embed.service.update_note_embedding") as mock_update,
+            patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes),
+            patch("habittracker.services.embedding_service.update_note_embedding") as mock_update,
         ):
             result = embed_notes(session, provider, expected_dims=768)
         assert result.skipped == 1
@@ -140,8 +140,8 @@ class TestDimensionValidation:
         provider = _make_provider(dims=768)
         notes = [_make_note()]
         with (
-            patch("scripts.embed.service.fetch_unembedded_notes", return_value=notes),
-            patch("scripts.embed.service.update_note_embedding") as mock_update,
+            patch("habittracker.services.embedding_service.fetch_unembedded_notes", return_value=notes),
+            patch("habittracker.services.embedding_service.update_note_embedding") as mock_update,
         ):
             result = embed_notes(session, provider, expected_dims=768)
         assert result.processed == 1
@@ -162,3 +162,4 @@ class TestEmbedResult:
     def test_error_ids_defaults_empty(self) -> None:
         r = EmbedResult()
         assert r.error_ids == []
+

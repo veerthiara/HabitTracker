@@ -8,18 +8,20 @@ Usage:
 Idempotent: only notes where embedding IS NULL are processed.
 Safe to re-run at any time.
 
-All configuration is in scripts/embed/config.py (driven by env vars).
-All SQL is in scripts/embed/repository.py.
-All provider logic is in scripts/embed/providers/.
-All pipeline logic is in scripts/embed/service.py.
+Package layout:
+    scripts/embed/db.py                                  — .env + DATABASE_URL + session
+    habittracker/core/config.py                          — Ollama/pipeline settings
+    habittracker/providers/ollama.py                     — embedding provider
+    habittracker/services/embedding_service.py           — pipeline logic
+    habittracker/models/repository/embedding_repository.py — SQL
 """
 
 import logging
 import sys
 
 from scripts.embed.db import get_session
-from scripts.embed.providers.ollama import OllamaProvider
-from scripts.embed.service import embed_notes
+from habittracker.providers.ollama import OllamaProvider
+from habittracker.services.embedding_service import embed_notes
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,11 +1,11 @@
-"""Tests for scripts.embed.providers.base.
+"""Tests for habittracker.providers.base.
 
 Verifies the EmbeddingProvider contract and EmbeddingError.
 """
 
 import pytest
 
-from scripts.embed.providers.base import EmbeddingError, EmbeddingProvider
+from habittracker.providers.base import EmbeddingError, EmbeddingProvider
 
 
 class _ConcreteProvider(EmbeddingProvider):
