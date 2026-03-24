@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from habittracker.api import health
 from habittracker.api.v1 import (
     bottle_events,
+    chat,
     dashboard,
     habit_logs,
     habits,
@@ -43,5 +44,6 @@ def create_application() -> FastAPI:
     app.include_router(notes.router, prefix=v1_prefix)
     app.include_router(search.router, prefix=v1_prefix)
     app.include_router(dashboard.router, prefix=v1_prefix)
+    app.include_router(chat.router, prefix=v1_prefix)
 
     return app
