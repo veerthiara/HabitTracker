@@ -17,7 +17,7 @@ Design rules:
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -119,7 +119,7 @@ def gather_context(
 def _gather_bottle_activity(
     session: Session, user_id: uuid.UUID,
 ) -> ChatContextResult:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     events = bottle_event_repository.get_events(session, user_id, for_date=today)
 
     total_ml = sum(e.volume_ml for e in events)
@@ -151,7 +151,7 @@ def _gather_bottle_activity(
 def _gather_habit_summary(
     session: Session, user_id: uuid.UUID,
 ) -> ChatContextResult:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     summary = dashboard_repository.get_summary(session, user_id, for_date=today)
 
     evidence = [
@@ -223,7 +223,7 @@ def _gather_general(
     message: str,
     embed_provider: EmbeddingProvider,
 ) -> ChatContextResult:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     summary = dashboard_repository.get_summary(session, user_id, for_date=today)
 
     evidence = [
