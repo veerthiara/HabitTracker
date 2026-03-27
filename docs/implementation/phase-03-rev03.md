@@ -14,7 +14,7 @@ Replace all stub pages with fully working feature UIs. Users can now create habi
 
 ## Architectural Context
 
-This revision closes out Phase 03 (Manual Logging MVP). All four routes (`/`, `/habits`, `/hydration`, `/notes`) are now fully interactive. The frontend talks to the FastAPI backend exclusively via the typed `apiFetch<T>()` wrapper; React Query handles caching and invalidation across pages (e.g. dashboard summary refreshes after a habit is marked done or a note is saved).
+This revision closes out Phase 03 (Manual Logging MVP). All four routes (`/`, `/habits`, `/hydration`, `/notes`) are now fully interactive. The frontend talks to the FastAPI backend exclusively via the typed ``apiFetch<T>()`` wrapper; React Query handles caching and invalidation across pages (for example, dashboard summary refreshes after a habit is marked done or a note is saved).
 
 ## Flow
 

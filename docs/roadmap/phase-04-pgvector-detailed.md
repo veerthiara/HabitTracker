@@ -51,9 +51,9 @@ make db-seed               # re-seeds all demo data
 ### Scope:
 
 - New backend/habittracker/models/repository/search_repository.py:
-    - search_notes(session, query_vec, limit) → list[NoteSearchHit]
-    - Uses pgvector <=> cosine distance operator
-    - Returns (id, content, score) — no embedding arrays
+    - `search_notes(session, query_vec, limit) -> list[NoteSearchHit]`
+    - Uses pgvector `<=>` cosine distance operator
+    - Returns `(id, content, score)` with no embedding arrays
 - New backend/habittracker/schemas/search.py:
     - NoteSearchHit — id: UUID, content: str, score: float (snippet truncated to 300 chars)
     - SearchResponse — query: str, results: list[NoteSearchHit]

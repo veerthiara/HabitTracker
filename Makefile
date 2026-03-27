@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build docs-install docs-run docs-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed
 
 backend-install:
 	cd backend && poetry install
@@ -23,6 +23,15 @@ client-run:
 
 client-build:
 	cd client && npm run build
+
+docs-install:
+	cd website && npm install
+
+docs-run:
+	cd website && npm run start
+
+docs-build:
+	cd website && npm run build
 
 local-db-up:
 	docker compose --env-file infra/local/.env -f infra/local/docker-compose.yml up -d
