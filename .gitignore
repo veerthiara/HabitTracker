@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.venv/
+*.pyc
+*.pyo
+
+__pycache__/
+backend/.env
+backend/.venv/
+client/node_modules/
+client/dist/
+client/.env
+client/.env.production
+client/.env.*.local
+client/*.tsbuildinfo
+infra/local/.env
+
