@@ -5,16 +5,24 @@ build_chat_graph() compiles a StateGraph from ChatGraphState with:
   - One conditional edge (intent_router) after classify_intent
   - Linear edges: gather_context → generate_answer → END
 
-Usage:
+Usage (no persistence):
     graph = build_chat_graph(embed_provider, chat_provider)
     result = graph.invoke(initial_state)
+
+Usage (with thread persistence):
+    from langgraph.checkpoint.memory import MemorySaver
+    graph = build_chat_graph(embed_provider, chat_provider, checkpointer=MemorySaver())
+    config = {"configurable": {"thread_id": "abc-123"}}
+    result = graph.invoke(initial_state, config=config)
 
 The compiled graph is intended to be a module-level singleton in the
 endpoint (instantiated once at app startup, reused across requests).
 
 Checkpointer:
-    Rev 02 — compiled without a checkpointer (no thread persistence).
-    Rev 04 — will add MemorySaver for thread_id-scoped state persistence.
+    Rev 02–03 — compiled without a checkpointer (checkpointer=None).
+    Rev 04    — accepts a MemorySaver; endpoint passes it in at startup.
+    Future    — Postgres-backed checkpointer can be swapped in with zero
+                node changes (just pass a different checkpointer instance).
 """
 
 from langgraph.graph import END, START, StateGraph
@@ -32,6 +40,7 @@ from habittracker.providers.base import ChatProvider, EmbeddingProvider
 def build_chat_graph(
     embed_provider: EmbeddingProvider,
     chat_provider: ChatProvider,
+    checkpointer=None,
 ):
     """Compile and return the LangGraph chat pipeline.
 
@@ -40,9 +49,15 @@ def build_chat_graph(
                         gather_context_node for NOTE_PATTERN / GENERAL).
         chat_provider:  Provider for LLM chat completion (used by
                         generate_answer_node).
+        checkpointer:   Optional LangGraph checkpointer for thread-scoped
+                        state persistence.  Pass a MemorySaver() instance
+                        for in-memory persistence (dev / testing).  None
+                        disables persistence (stateless, single-turn).
 
     Returns:
         A compiled LangGraph CompiledStateGraph ready for .invoke().
+        When a checkpointer is provided, .invoke() requires:
+            config={"configurable": {"thread_id": "<thread_id>"}}
     """
     graph = StateGraph(ChatGraphState)
 
@@ -64,4 +79,4 @@ def build_chat_graph(
     # Terminal edge
     graph.add_edge("generate_answer", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
