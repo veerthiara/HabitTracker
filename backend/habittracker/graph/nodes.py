@@ -57,16 +57,22 @@ def make_gather_context_node(embed_provider: EmbeddingProvider):
     """Factory that returns a gather_context_node closed over embed_provider.
 
     The returned node:
-      Reads:  state["session"], state["user_id"], state["intent"],
-              state["message"]
+      Reads:  state["user_id"], state["intent"], state["message"]
+              config["configurable"]["session"]  ← injected; not in state
       Writes: state["evidence"], state["context_text"], state["used_notes"]
+
+    Session is in config rather than state because MemorySaver serialises
+    the full state via msgpack and SQLAlchemy Sessions are not serialisable.
+    LangGraph passes config as the optional second argument to any node
+    whose function signature accepts it.
 
     Not called for UNSUPPORTED intent — the routing edge skips this node.
     """
 
-    def gather_context_node(state: ChatGraphState) -> dict:
+    def gather_context_node(state: ChatGraphState, config) -> dict:
+        session = (config or {}).get("configurable", {}).get("session")
         context = gather_context(
-            state["session"],
+            session,
             state["user_id"],
             ChatIntent(state["intent"]),
             state["message"],

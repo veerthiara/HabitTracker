@@ -66,15 +66,21 @@ class TestClassifyIntentNode:
 
 class TestGatherContextNode:
     """gather_context_node is tested by patching gather_context at the
-    import site inside habittracker.graph.nodes."""
+    import site inside habittracker.graph.nodes.
+
+    Session is now injected via config["configurable"]["session"] rather
+    than state["session"] (MemorySaver cannot serialise a Session).
+    """
 
     def _make_state(self, intent: ChatIntent = ChatIntent.BOTTLE_ACTIVITY):
         return {
-            "session": MagicMock(),
             "user_id": uuid.uuid4(),
             "intent": str(intent),
             "message": "How much water did I drink today?",
         }
+
+    def _config(self):
+        return {"configurable": {"session": MagicMock()}}
 
     def test_populates_evidence_and_context(self, monkeypatch):
         mock_context = ChatContextResult(
@@ -88,7 +94,7 @@ class TestGatherContextNode:
         )
         mock_embed = MagicMock()
         node = make_gather_context_node(mock_embed)
-        result = node(self._make_state())
+        result = node(self._make_state(), self._config())
 
         assert result["evidence"] == mock_context.evidence
         assert result["context_text"] == "Bottle pickups today: 6"
@@ -106,7 +112,7 @@ class TestGatherContextNode:
         )
         mock_embed = MagicMock()
         node = make_gather_context_node(mock_embed)
-        result = node(self._make_state(ChatIntent.NOTE_PATTERN))
+        result = node(self._make_state(ChatIntent.NOTE_PATTERN), self._config())
 
         assert result["used_notes"] is True
 
@@ -121,7 +127,7 @@ class TestGatherContextNode:
         monkeypatch.setattr("habittracker.graph.nodes.gather_context", fake_gather)
         mock_embed = MagicMock()
         node = make_gather_context_node(mock_embed)
-        node(self._make_state(ChatIntent.HABIT_SUMMARY))
+        node(self._make_state(ChatIntent.HABIT_SUMMARY), self._config())
 
         assert captured["intent"] == ChatIntent.HABIT_SUMMARY
 
@@ -132,7 +138,7 @@ class TestGatherContextNode:
             lambda *a, **k: mock_context,
         )
         node = make_gather_context_node(MagicMock())
-        result = node(self._make_state())
+        result = node(self._make_state(), self._config())
 
         assert result["evidence"] == []
         assert result["context_text"] == ""

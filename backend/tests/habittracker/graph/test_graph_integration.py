@@ -56,13 +56,17 @@ def graph(mock_embed, mock_chat):
 
 
 def _base_state(message: str) -> dict:
-    """Minimal input state for graph.invoke()."""
+    """Minimal input state for graph.invoke(). Session is passed via config."""
     return {
         "user_id": uuid.uuid4(),
-        "session": MagicMock(),
         "message": message,
         "thread_id": str(uuid.uuid4()),
     }
+
+
+def _config() -> dict:
+    """Config dict with a mock session injected for gather_context_node."""
+    return {"configurable": {"session": MagicMock()}}
 
 
 def _bottle_context() -> ChatContextResult:
@@ -95,7 +99,7 @@ class TestGraphHappyPath:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink today?"))
+        state = graph.invoke(_base_state("How much water did I drink today?"), config=_config())
 
         assert state["intent"] == "bottle_activity"
         assert len(state["evidence"]) == 2
@@ -113,7 +117,7 @@ class TestGraphHappyPath:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: habit_context,
         )
-        state = graph.invoke(_base_state("Did I complete my morning habit today?"))
+        state = graph.invoke(_base_state("Did I complete my morning habit today?"), config=_config())
 
         assert state["intent"] == "habit_summary"
         assert state["used_notes"] is False
@@ -124,7 +128,7 @@ class TestGraphHappyPath:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _note_context(),
         )
-        state = graph.invoke(_base_state("Why do I always feel tired?"))
+        state = graph.invoke(_base_state("Why do I always feel tired?"), config=_config())
 
         assert state["intent"] == "note_pattern_question"
         assert state["used_notes"] is True
@@ -140,7 +144,7 @@ class TestGraphHappyPath:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: general_context,
         )
-        state = graph.invoke(_base_state("Give me a summary of my progress"))
+        state = graph.invoke(_base_state("Give me a summary of my progress"), config=_config())
 
         assert state["intent"] == "general_question"
         assert len(state["evidence"]) > 0
@@ -157,7 +161,7 @@ class TestGraphUnsupportedShortcut:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: gather_called.append(True) or ChatContextResult(),
         )
-        state = graph.invoke(_base_state("hello"))
+        state = graph.invoke(_base_state("hello"), config=_config())
 
         assert state["intent"] == "unsupported"
         assert state["answer"] == FALLBACK_ANSWER
@@ -165,7 +169,7 @@ class TestGraphUnsupportedShortcut:
         mock_chat.complete.assert_not_called()
 
     def test_unsupported_short_message(self, graph, mock_chat):
-        state = graph.invoke(_base_state("hi"))
+        state = graph.invoke(_base_state("hi"), config=_config())
 
         assert state["intent"] == "unsupported"
         assert state["answer"] == FALLBACK_ANSWER
@@ -184,7 +188,7 @@ class TestGraphNoEvidenceFallback:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: ChatContextResult(evidence=[], context_text="", used_notes=False),
         )
-        state = graph.invoke(_base_state("How much water did I drink today?"))
+        state = graph.invoke(_base_state("How much water did I drink today?"), config=_config())
 
         assert state["answer"] == FALLBACK_ANSWER
         mock_chat.complete.assert_not_called()
@@ -194,7 +198,7 @@ class TestGraphNoEvidenceFallback:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: ChatContextResult(evidence=[], context_text="", used_notes=False),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         assert state["used_notes"] is False
 
@@ -209,7 +213,7 @@ class TestGraphAnswerCap:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         assert len(state["answer"]) == MAX_ANSWER_LEN
 
@@ -220,7 +224,7 @@ class TestGraphAnswerCap:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water?"))
+        state = graph.invoke(_base_state("How much water?"), config=_config())
 
         assert state["answer"] == short
 
@@ -237,7 +241,7 @@ class TestGraphResponseContract:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         assert "answer" in state
         assert "intent" in state
@@ -249,7 +253,7 @@ class TestGraphResponseContract:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         for item in state["evidence"]:
             assert isinstance(item, EvidenceItem)
@@ -259,7 +263,7 @@ class TestGraphResponseContract:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         assert isinstance(state["intent"], str)
 
@@ -271,7 +275,7 @@ class TestGraphResponseContract:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: _bottle_context(),
         )
-        state = graph.invoke(_base_state("How much water did I drink?"))
+        state = graph.invoke(_base_state("How much water did I drink?"), config=_config())
 
         # Build a ChatResponse from graph state — must not raise
         response = ChatResponse(

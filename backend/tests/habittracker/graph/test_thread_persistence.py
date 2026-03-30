@@ -42,16 +42,16 @@ def graph_with_memory(mock_chat):
 def _state(message: str) -> dict:
     return {
         "user_id": uuid.uuid4(),
-        "session": None,   # None is msgpack-serializable; gather_context is
-                           # always monkeypatched in these tests so session is
-                           # never actually used by a node.
         "message": message,
         "thread_id": str(uuid.uuid4()),
     }
 
 
 def _config(thread_id: str) -> dict:
-    return {"configurable": {"thread_id": thread_id}}
+    # gather_context is monkeypatched in all these tests, so session=None is
+    # fine — it is never read by the node.  Session lives in config (not state)
+    # so that MemorySaver never tries to serialise the SQLAlchemy Session object.
+    return {"configurable": {"thread_id": thread_id, "session": None}}
 
 
 def _bottle_context() -> ChatContextResult:
