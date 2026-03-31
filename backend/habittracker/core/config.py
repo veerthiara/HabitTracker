@@ -16,6 +16,12 @@ Environment variables:
     OLLAMA_RETRY_BACKOFF_SEC — Initial backoff in seconds; doubles each retry (default: 1)
     EMBED_BATCH_SIZE         — Notes per commit batch in the pipeline (default: 50)
     EMBED_EXPECTED_DIMS      — Expected vector dimensions; mismatches are rejected (default: 768)
+
+Langfuse observability (optional — see core/langfuse_integration.py):
+    LANGFUSE_PUBLIC_KEY      — Langfuse project public key (required to enable)
+    LANGFUSE_SECRET_KEY      — Langfuse project secret key (required to enable)
+    LANGFUSE_BASE_URL        — Langfuse server URL (required; e.g. http://localhost:3000)
+    LANGFUSE_TRACING_ENABLED — Set to "false" to disable tracing (default: "true")
 """
 
 import os
