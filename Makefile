@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build docs-install docs-run docs-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build docs-install docs-run docs-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed langfuse-up langfuse-down langfuse-logs langfuse-ps langfuse-reset
 
 backend-install:
 	cd backend && poetry install
@@ -76,3 +76,22 @@ embed-notes:
 
 test-embed:
 	cd backend && poetry run pytest tests/scripts/embed/ -v
+
+# ── Langfuse (local observability) ────────────────────────────────────────────
+
+langfuse-up:
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml up -d
+
+langfuse-down:
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml down
+
+langfuse-logs:
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml logs -f
+
+langfuse-ps:
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml ps
+
+# ⚠️  Destroys and recreates the volume — all Langfuse data is lost.
+langfuse-reset:
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml down -v
+	docker compose --env-file infra/local/langfuse/.env -f infra/local/langfuse/docker-compose.yml up -d
