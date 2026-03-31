@@ -95,15 +95,16 @@ class TestGetLangfuseCallbackHandler:
         assert handler is not None
 
     def test_returns_none_on_import_failure(self):
-        """If langfuse.langchain is broken, returns None gracefully."""
+        """If langfuse.langchain cannot be imported, returns None gracefully."""
         mod = _reload_module({
             "LANGFUSE_PUBLIC_KEY": "pk-123",
             "LANGFUSE_SECRET_KEY": "sk-456",
             "LANGFUSE_BASE_URL": "http://localhost:3000",
         })
-        with mock.patch.dict("sys.modules", {"langfuse.langchain": None}):
-            # Force re-import failure inside the function
+        # Simulate CallbackHandler constructor raising an exception.
+        with mock.patch(
+            "langfuse.langchain.CallbackHandler",
+            side_effect=RuntimeError("simulated failure"),
+        ):
             result = mod.get_langfuse_callback_handler()
-            # Should gracefully return None or a handler (depends on caching)
-            # The key assertion is: no exception raised
-            assert result is None or result is not None
+        assert result is None
