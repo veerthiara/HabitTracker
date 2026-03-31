@@ -59,7 +59,7 @@ def _base_state(message: str) -> dict:
     """Minimal input state for graph.invoke(). Session is passed via config."""
     return {
         "user_id": uuid.uuid4(),
-        "message": message,
+        "current_message": message,
         "thread_id": str(uuid.uuid4()),
     }
 

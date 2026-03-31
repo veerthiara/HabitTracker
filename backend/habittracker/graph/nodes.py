@@ -13,6 +13,25 @@ Node design rules:
   - gather_context_node and generate_answer_node receive their providers
     via closure at graph-build time (see builder.py).
 
+Conversation memory design (Rev 06):
+  - state["messages"] holds only *completed* user+assistant pairs.
+    The current user input always lives in state["current_message"] and is
+    never pre-written to messages — this eliminates any positional slicing trick.
+  - generate_answer_node is the sole writer of messages.  It appends both the
+    user turn (current_message) and the assistant turn (answer) together at the
+    end of the node, keeping messages always in a consistent even-length state.
+  - classify_intent_node does NOT touch messages.
+  - CONVERSATION_WINDOW (from core/config.py) controls how many prior turns
+    are included in the LLM payload.  Older turns stay in the checkpoint.
+
+Prompt structure (three explicit layers):
+  1. [system]  — identity + trust rules
+  2. [user/assistant]  — windowed prior completed turns (verbatim)
+  3. [user]  — current turn: verified DB evidence + the user's question
+
+    Trust is communicated via the system prompt (layer 1), not by embedding
+    labels inside the user message content.
+
 Node call chain (happy path):
   classify_intent_node → gather_context_node → generate_answer_node
 
@@ -22,8 +41,10 @@ UNSUPPORTED shortcut (conditional edge in routing.py):
 
 import logging
 
+from habittracker.core.config import CONVERSATION_WINDOW
 from habittracker.graph.state import ChatGraphState
 from habittracker.providers.base import ChatProvider, EmbeddingProvider
+from habittracker.schemas.conversation import ConversationTurn
 from habittracker.schemas.intent import ChatIntent
 from habittracker.services.chat_context_service import gather_context
 from habittracker.services.chat_intent_service import classify_intent
@@ -36,17 +57,79 @@ from habittracker.services.chat_service import (
 logger = logging.getLogger(__name__)
 
 
+# ── Prompt builders ───────────────────────────────────────────────────────────
+
+def _build_user_content(
+    context_text: str,
+    current_message: str,
+) -> str:
+    """Build the content string for the current user turn in the LLM payload.
+
+    Contains only the two things unique to this turn:
+      1. Verified evidence from DB/search — explicitly labeled so the model
+         knows it is the authoritative source of factual claims.
+      2. The user's question.
+
+    Prior conversation turns are NOT included here — they are already present
+    as structured role/content messages earlier in the payload (layer 2 in
+    _build_llm_payload).  Duplicating them as a text recap would be redundant
+    and could confuse the model about trust levels.
+    """
+    return (
+        f"Evidence (verified, from database/search):\n{context_text}"
+        f"\n\nQuestion: {current_message}"
+    )
+
+
+def _build_llm_payload(
+    system_prompt: str,
+    history: list[ConversationTurn],
+    context_text: str,
+    current_message: str,
+) -> list[ConversationTurn]:
+    """Assemble the ordered message list sent to the chat provider.
+
+    Layer 1 — system (role="system"):
+        Identity + trust rules. Always first. Never repeated.
+
+    Layer 2 — prior completed turns (role="user" / role="assistant"):
+        Windowed pairs from state["messages"]. Sent verbatim as structured
+        messages so the model has natural conversational context.
+        These are labeled in the system prompt as session history, not
+        verified DB evidence.
+
+    Layer 3 — current user turn (role="user"):
+        Verified DB/search evidence + the user's question for this turn.
+        History is NOT repeated here — it is already present in layer 2.
+
+    Returns list[ConversationTurn] passable directly to ChatProvider.complete().
+    """
+    payload: list[ConversationTurn] = [
+        ConversationTurn(role="system", content=system_prompt)
+    ]
+    payload.extend(history)
+    payload.append(
+        ConversationTurn(
+            role="user",
+            content=_build_user_content(context_text, current_message),
+        )
+    )
+    return payload
+
+
 # ── Node 1: intent classification ─────────────────────────────────────────────
 
 def classify_intent_node(state: ChatGraphState) -> dict:
     """Classify the user message into a ChatIntent.
 
-    Reads:  state["message"]
+    Reads:  state["current_message"]
     Writes: state["intent"] (str value of ChatIntent enum)
 
     No I/O — deterministic keyword matching only.
+    Does NOT touch state["messages"]; generate_answer_node is the sole
+    writer of conversation history.
     """
-    intent = classify_intent(state["message"])
+    intent = classify_intent(state["current_message"])
     logger.debug("classify_intent_node: intent=%s", intent)
     return {"intent": str(intent)}
 
@@ -57,7 +140,7 @@ def make_gather_context_node(embed_provider: EmbeddingProvider):
     """Factory that returns a gather_context_node closed over embed_provider.
 
     The returned node:
-      Reads:  state["user_id"], state["intent"], state["message"]
+      Reads:  state["user_id"], state["intent"], state["current_message"]
               config["configurable"]["session"]  ← injected; not in state
       Writes: state["evidence"], state["context_text"], state["used_notes"]
 
@@ -75,7 +158,7 @@ def make_gather_context_node(embed_provider: EmbeddingProvider):
             session,
             state["user_id"],
             ChatIntent(state["intent"]),
-            state["message"],
+            state["current_message"],
             embed_provider,
         )
         logger.debug(
@@ -98,25 +181,47 @@ def make_generate_answer_node(chat_provider: ChatProvider):
     """Factory that returns a generate_answer_node closed over chat_provider.
 
     The returned node:
-      Reads:  state["evidence"], state["context_text"], state["message"]
+      Reads:  state["current_message"], state["evidence"],
+              state["context_text"], state["messages"]
       Writes: state["answer"]
+               state["messages"] — appends [user_turn, assistant_turn] together
 
-    If evidence is empty — which happens for UNSUPPORTED intent or when no
-    data exists for a supported intent — the LLM is never called and the
-    safe fallback string is returned directly.
+    messages is the sole responsibility of this node.  After the answer is
+    produced, both the current user turn and the assistant answer are appended
+    as a completed pair.  This keeps messages always in an even-length,
+    consistent state — no positional assumptions are needed anywhere.
+
+    If evidence is empty the LLM is never called.  The fallback answer is
+    still recorded in messages so the thread history remains complete.
     """
 
     def generate_answer_node(state: ChatGraphState) -> dict:
+        current_message = state["current_message"]
         evidence = state.get("evidence") or []
 
-        # No-evidence shortcut: never hallucinate when there is nothing to
-        # ground the answer on.  Mirrors the same guard in handle_chat.
+        # No-evidence shortcut — never hallucinate without grounded data.
         if not evidence:
             logger.info("generate_answer_node: no evidence — returning fallback")
-            return {"answer": FALLBACK_ANSWER}
+            return {
+                "answer": FALLBACK_ANSWER,
+                "messages": [
+                    ConversationTurn(role="user", content=current_message),
+                    ConversationTurn(role="assistant", content=FALLBACK_ANSWER),
+                ],
+            }
 
-        user_prompt = f"Data:\n{state['context_text']}\n\nQuestion: {state['message']}"
-        answer = chat_provider.complete(SYSTEM_PROMPT, user_prompt)
+        # Apply the sliding window to prior completed turns.
+        prior_turns: list[ConversationTurn] = state.get("messages") or []
+        windowed = prior_turns[-CONVERSATION_WINDOW:]
+
+        payload = _build_llm_payload(
+            system_prompt=SYSTEM_PROMPT,
+            history=windowed,
+            context_text=state["context_text"],
+            current_message=current_message,
+        )
+
+        answer = chat_provider.complete(payload)
 
         if len(answer) > MAX_ANSWER_LEN:
             answer = answer[:MAX_ANSWER_LEN]
@@ -126,6 +231,12 @@ def make_generate_answer_node(chat_provider: ChatProvider):
             len(answer),
             state.get("used_notes", False),
         )
-        return {"answer": answer}
+        return {
+            "answer": answer,
+            "messages": [
+                ConversationTurn(role="user", content=current_message),
+                ConversationTurn(role="assistant", content=answer),
+            ],
+        }
 
     return generate_answer_node

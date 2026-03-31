@@ -84,7 +84,7 @@ def chat(
 
     initial_state = {
         "user_id": user_id,
-        "message": request.message,
+        "current_message": request.message,
         "thread_id": thread_id,
     }
     config = {

@@ -42,7 +42,7 @@ def graph_with_memory(mock_chat):
 def _state(message: str) -> dict:
     return {
         "user_id": uuid.uuid4(),
-        "message": message,
+        "current_message": message,
         "thread_id": str(uuid.uuid4()),
     }
 

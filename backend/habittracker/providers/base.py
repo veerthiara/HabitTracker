@@ -45,12 +45,18 @@ class ChatProvider(ABC):
     """Contract every chat/completion provider must satisfy."""
 
     @abstractmethod
-    def complete(self, system: str, user: str) -> str:
-        """Generate a completion given a system prompt and a user message.
+    def complete(self, messages: list[dict]) -> str:
+        """Generate a completion from an ordered list of chat messages.
+
+        Each message is a dict with keys:
+            role:    "system", "user", or "assistant".
+            content: The text content for that role.
+
+        The caller is responsible for ordering the messages correctly
+        (system first, then conversation history, then current user turn).
 
         Args:
-            system: Instructions / constraints for the model.
-            user:   The user's message or question.
+            messages: Ordered list of role/content dicts.
 
         Returns:
             The model's response as a plain string.

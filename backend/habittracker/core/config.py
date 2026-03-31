@@ -36,3 +36,10 @@ OLLAMA_CHAT_TIMEOUT_SEC: float = float(os.getenv("OLLAMA_CHAT_TIMEOUT_SEC", "120
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 EMBED_BATCH_SIZE: int = int(os.getenv("EMBED_BATCH_SIZE", "50"))
 EMBED_EXPECTED_DIMS: int = int(os.getenv("EMBED_EXPECTED_DIMS", "768"))
+
+# ── Conversation memory ───────────────────────────────────────────────────────
+# Maximum number of ConversationTurn entries fed to the LLM per request.
+# Each user+assistant pair = 2 entries, so 10 entries = 5 prior exchanges.
+# Older turns remain in the MemorySaver checkpoint but are not sent to the LLM.
+# Override via the CONVERSATION_WINDOW env var to tune without code changes.
+CONVERSATION_WINDOW: int = int(os.getenv("CONVERSATION_WINDOW", "10"))

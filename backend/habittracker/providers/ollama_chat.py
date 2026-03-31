@@ -50,15 +50,15 @@ class OllamaChatProvider(ChatProvider):
         self._retry_backoff = retry_backoff
         self._client = httpx.Client(timeout=timeout)
 
-    def complete(self, system: str, user: str) -> str:
-        """Send a chat request and return the model's response text.
+    def complete(self, messages: list[dict]) -> str:
+        """Send a multi-turn chat request and return the model's response text.
 
         Retries on transient HTTP errors (5xx, connect errors) up to
         max_retries times with exponential backoff.
 
         Args:
-            system: System prompt containing instructions / constraints.
-            user:   The user's message or question.
+            messages: Ordered list of role/content dicts to send to Ollama.
+                      Expected order: system, [prior turns...], current user.
 
         Returns:
             The model's response as a plain string.
@@ -69,10 +69,7 @@ class OllamaChatProvider(ChatProvider):
         """
         payload = {
             "model": self._model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
+            "messages": messages,
             "stream": False,
         }
         last_exc: Exception | None = None

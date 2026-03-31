@@ -34,35 +34,59 @@ def _mock_response(content: str) -> MagicMock:
     return resp
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _msgs(system="You are helpful.", user="How did I do today?") -> list[dict]:
+    """Build a minimal two-message payload for tests."""
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+
+
 # ── Success path ──────────────────────────────────────────────────────────────
 
 class TestOllamaChatProviderSuccess:
     @patch("httpx.Client.post")
     def test_returns_content_on_success(self, mock_post) -> None:
         mock_post.return_value = _mock_response(_FAKE_ANSWER)
-        result = _make_provider().complete("You are helpful.", "How did I do today?")
+        result = _make_provider().complete(_msgs())
         assert result == _FAKE_ANSWER
 
     @patch("httpx.Client.post")
     def test_calls_correct_endpoint(self, mock_post) -> None:
         mock_post.return_value = _mock_response(_FAKE_ANSWER)
-        _make_provider().complete("system", "user")
+        _make_provider().complete(_msgs())
         assert mock_post.call_args[0][0] == "http://localhost:11434/api/chat"
 
     @patch("httpx.Client.post")
     def test_sends_correct_payload(self, mock_post) -> None:
         mock_post.return_value = _mock_response(_FAKE_ANSWER)
-        _make_provider(model="llama3.2").complete("sys prompt", "user msg")
+        messages = _msgs(system="sys prompt", user="user msg")
+        _make_provider(model="llama3.2").complete(messages)
         payload = mock_post.call_args[1]["json"]
         assert payload["model"] == "llama3.2"
         assert payload["stream"] is False
-        assert payload["messages"][0] == {"role": "system", "content": "sys prompt"}
-        assert payload["messages"][1] == {"role": "user", "content": "user msg"}
+        assert payload["messages"] == messages
 
     @patch("httpx.Client.post")
     def test_returns_string(self, mock_post) -> None:
         mock_post.return_value = _mock_response("ok")
-        assert isinstance(_make_provider().complete("s", "u"), str)
+        assert isinstance(_make_provider().complete(_msgs()), str)
+
+    @patch("httpx.Client.post")
+    def test_multi_turn_payload_passed_verbatim(self, mock_post) -> None:
+        """Provider must forward the full messages list to Ollama unchanged."""
+        mock_post.return_value = _mock_response(_FAKE_ANSWER)
+        multi = [
+            {"role": "system", "content": "You are an assistant."},
+            {"role": "user", "content": "I drank 8 glasses today."},
+            {"role": "assistant", "content": "Got it!"},
+            {"role": "user", "content": "What did I just tell you?"},
+        ]
+        _make_provider().complete(multi)
+        payload = mock_post.call_args[1]["json"]
+        assert payload["messages"] == multi
 
 
 # ── Error handling ────────────────────────────────────────────────────────────
@@ -76,7 +100,7 @@ class TestOllamaChatProviderErrors:
         bad_resp.raise_for_status = MagicMock()
         mock_post.return_value = bad_resp
         with pytest.raises(ChatCompletionError, match="message.content"):
-            _make_provider().complete("s", "u")
+            _make_provider().complete(_msgs())
 
     @patch("httpx.Client.post")
     def test_raises_on_missing_content_key(self, mock_post) -> None:
@@ -86,7 +110,7 @@ class TestOllamaChatProviderErrors:
         bad_resp.raise_for_status = MagicMock()
         mock_post.return_value = bad_resp
         with pytest.raises(ChatCompletionError, match="message.content"):
-            _make_provider().complete("s", "u")
+            _make_provider().complete(_msgs())
 
     @patch("httpx.Client.post")
     def test_raises_immediately_on_4xx(self, mock_post) -> None:
@@ -98,7 +122,7 @@ class TestOllamaChatProviderErrors:
         )
         mock_post.return_value = err_resp
         with pytest.raises(ChatCompletionError, match="400"):
-            _make_provider(max_retries=3).complete("s", "u")
+            _make_provider(max_retries=3).complete(_msgs())
 
     @patch("httpx.Client.post")
     def test_retries_on_5xx_then_raises(self, mock_post) -> None:
@@ -110,7 +134,7 @@ class TestOllamaChatProviderErrors:
         )
         mock_post.return_value = err_resp
         with pytest.raises(ChatCompletionError):
-            _make_provider(max_retries=2, retry_backoff=0.0).complete("s", "u")
+            _make_provider(max_retries=2, retry_backoff=0.0).complete(_msgs())
         # max_retries=2 → 3 total attempts
         assert mock_post.call_count == 3
 
@@ -118,14 +142,14 @@ class TestOllamaChatProviderErrors:
     def test_retries_on_connect_error(self, mock_post) -> None:
         mock_post.side_effect = httpx.ConnectError("connection refused")
         with pytest.raises(ChatCompletionError, match="after 2 attempt"):
-            _make_provider(max_retries=1, retry_backoff=0.0).complete("s", "u")
+            _make_provider(max_retries=1, retry_backoff=0.0).complete(_msgs())
 
     @patch("httpx.Client.post")
     def test_timeout_not_retried(self, mock_post) -> None:
         """Timeouts are not retried — local LLMs can hang indefinitely."""
         mock_post.side_effect = httpx.TimeoutException("timed out")
         with pytest.raises(ChatCompletionError, match="timed out"):
-            _make_provider(max_retries=3, retry_backoff=0.0).complete("s", "u")
+            _make_provider(max_retries=3, retry_backoff=0.0).complete(_msgs())
         # Must not retry on timeout
         assert mock_post.call_count == 1
 

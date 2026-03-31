@@ -29,37 +29,44 @@ from habittracker.services.chat_service import FALLBACK_ANSWER, MAX_ANSWER_LEN
 
 class TestClassifyIntentNode:
     def test_bottle_message(self):
-        state = {"message": "How much water did I drink today?"}
+        state = {"current_message": "How much water did I drink today?"}
         result = classify_intent_node(state)
-        assert result == {"intent": "bottle_activity"}
+        assert result["intent"] == "bottle_activity"
 
     def test_habit_message(self):
-        state = {"message": "Did I complete my morning habit?"}
+        state = {"current_message": "Did I complete my morning habit?"}
         result = classify_intent_node(state)
-        assert result == {"intent": "habit_summary"}
+        assert result["intent"] == "habit_summary"
 
     def test_note_pattern_message(self):
         # "habit" is checked before "why" in the classifier, so the message
         # must not contain habit keywords to reach NOTE_PATTERN.
-        state = {"message": "Why do I always feel tired on Fridays?"}
+        state = {"current_message": "Why do I always feel tired on Fridays?"}
         result = classify_intent_node(state)
-        assert result == {"intent": "note_pattern_question"}
+        assert result["intent"] == "note_pattern_question"
 
     def test_general_message(self):
-        state = {"message": "Give me a summary of my week"}
+        state = {"current_message": "Give me a summary of my week"}
         result = classify_intent_node(state)
-        assert result == {"intent": "general_question"}
+        assert result["intent"] == "general_question"
 
     def test_unsupported_greeting(self):
-        state = {"message": "hello"}
+        state = {"current_message": "hello"}
         result = classify_intent_node(state)
-        assert result == {"intent": "unsupported"}
+        assert result["intent"] == "unsupported"
 
     def test_returns_string_not_enum(self):
         """Node must write a plain str to state, not a ChatIntent enum."""
-        state = {"message": "How much water did I drink?"}
+        state = {"current_message": "How much water did I drink?"}
         result = classify_intent_node(state)
         assert isinstance(result["intent"], str)
+
+    def test_does_not_write_messages(self):
+        """classify_intent_node must NOT touch messages — generate_answer_node
+        is the sole writer of conversation history."""
+        state = {"current_message": "How much water did I drink today?"}
+        result = classify_intent_node(state)
+        assert "messages" not in result
 
 
 # ── gather_context_node ───────────────────────────────────────────────────────
@@ -76,7 +83,7 @@ class TestGatherContextNode:
         return {
             "user_id": uuid.uuid4(),
             "intent": str(intent),
-            "message": "How much water did I drink today?",
+            "current_message": "How much water did I drink today?",
         }
 
     def _config(self):
@@ -150,20 +157,42 @@ class TestGenerateAnswerNode:
     def _evidence(self):
         return [EvidenceItem(type="metric", label="Pickups", value="6")]
 
+    def _state_with_evidence(self, prior_messages=None):
+        """State for a turn. messages contains only completed prior pairs;
+        current_message is the fresh user input for this turn."""
+        return {
+            "evidence": self._evidence(),
+            "context_text": "Bottle pickups today: 6",
+            "current_message": "How much water did I drink?",
+            "messages": list(prior_messages or []),
+        }
+
     def test_fallback_on_empty_evidence(self):
         mock_chat = MagicMock()
         node = make_generate_answer_node(mock_chat)
-        state = {"evidence": [], "context_text": "", "message": "How much water?"}
+        state = {"evidence": [], "context_text": "", "current_message": "How much water?", "messages": []}
         result = node(state)
 
         assert result["answer"] == FALLBACK_ANSWER
         mock_chat.complete.assert_not_called()
 
+    def test_fallback_appends_both_turns(self):
+        """On fallback, generate_answer_node appends the user turn AND the
+        fallback assistant reply so the thread history stays complete."""
+        mock_chat = MagicMock()
+        node = make_generate_answer_node(mock_chat)
+        state = {"evidence": [], "context_text": "", "current_message": "hello", "messages": []}
+        result = node(state)
+
+        assert len(result["messages"]) == 2
+        assert result["messages"][0] == {"role": "user", "content": "hello"}
+        assert result["messages"][1] == {"role": "assistant", "content": FALLBACK_ANSWER}
+
     def test_fallback_when_evidence_key_missing(self):
         """evidence key absent from state (UNSUPPORTED path)."""
         mock_chat = MagicMock()
         node = make_generate_answer_node(mock_chat)
-        state = {"context_text": "", "message": "hello"}
+        state = {"context_text": "", "current_message": "hello"}
         result = node(state)
 
         assert result["answer"] == FALLBACK_ANSWER
@@ -173,43 +202,125 @@ class TestGenerateAnswerNode:
         mock_chat = MagicMock()
         mock_chat.complete.return_value = "You drank 6 times today."
         node = make_generate_answer_node(mock_chat)
-        state = {
-            "evidence": self._evidence(),
-            "context_text": "Bottle pickups today: 6",
-            "message": "How much water did I drink?",
-        }
-        result = node(state)
+        result = node(self._state_with_evidence())
 
         assert result["answer"] == "You drank 6 times today."
         mock_chat.complete.assert_called_once()
 
-    def test_prompt_contains_context_and_message(self):
-        """The user prompt passed to the LLM must include both data and question."""
+    def test_llm_receives_message_list(self):
+        """complete() must be called with a list of dicts (not two strings)."""
         mock_chat = MagicMock()
         mock_chat.complete.return_value = "Answer."
         node = make_generate_answer_node(mock_chat)
-        state = {
-            "evidence": self._evidence(),
-            "context_text": "Bottle pickups: 6",
-            "message": "How much water?",
-        }
-        node(state)
+        node(self._state_with_evidence())
 
-        _, user_prompt = mock_chat.complete.call_args[0]
-        assert "Bottle pickups: 6" in user_prompt
-        assert "How much water?" in user_prompt
+        args, _ = mock_chat.complete.call_args
+        assert len(args) == 1
+        assert isinstance(args[0], list)
+        assert all("role" in m and "content" in m for m in args[0])
+
+    def test_prompt_contains_evidence_context(self):
+        """The current user turn content must include the DB evidence text."""
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+        node(self._state_with_evidence())
+
+        messages = mock_chat.complete.call_args[0][0]
+        last_user = next(m for m in reversed(messages) if m["role"] == "user")
+        assert "Bottle pickups today: 6" in last_user["content"]
+        assert "How much water did I drink?" in last_user["content"]
+
+    def test_system_prompt_is_first_message(self):
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+        node(self._state_with_evidence())
+
+        messages = mock_chat.complete.call_args[0][0]
+        assert messages[0]["role"] == "system"
+
+    def test_prior_history_included_in_payload(self):
+        """Prior completed pairs are sent verbatim in the LLM payload."""
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+        prior = [
+            {"role": "user", "content": "I drank 8 glasses"},
+            {"role": "assistant", "content": "Got it!"},
+        ]
+        node(self._state_with_evidence(prior_messages=prior))
+
+        messages = mock_chat.complete.call_args[0][0]
+        # system + 2 prior + current user = 4
+        assert len(messages) == 4
+        assert messages[1] == {"role": "user", "content": "I drank 8 glasses"}
+        assert messages[2] == {"role": "assistant", "content": "Got it!"}
+
+    def test_history_trust_rules_in_system_prompt(self):
+        """Trust-level rules must live in the system prompt, not the user turn.
+        The system prompt must distinguish verified evidence from session history."""
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+        prior = [
+            {"role": "user", "content": "I drank 8 glasses"},
+            {"role": "assistant", "content": "Noted!"},
+        ]
+        node(self._state_with_evidence(prior_messages=prior))
+
+        messages = mock_chat.complete.call_args[0][0]
+        system_content = messages[0]["content"]   # layer 1
+        assert "unverified" in system_content.lower() or "session" in system_content.lower()
+
+    def test_evidence_labeled_as_verified(self):
+        """The final user content must label the DB evidence as verified."""
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+        node(self._state_with_evidence())
+
+        messages = mock_chat.complete.call_args[0][0]
+        last_user = next(m for m in reversed(messages) if m["role"] == "user")
+        assert "verified" in last_user["content"].lower()
+
+    def test_appends_both_user_and_assistant_turns(self):
+        """generate_answer_node appends both the user turn and the assistant
+        reply as a completed pair — messages is always even-length."""
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "You drank 6 times."
+        node = make_generate_answer_node(mock_chat)
+        result = node(self._state_with_evidence())
+
+        assert len(result["messages"]) == 2
+        assert result["messages"][0] == {"role": "user", "content": "How much water did I drink?"}
+        assert result["messages"][1] == {"role": "assistant", "content": "You drank 6 times."}
+
+    def test_window_cap_limits_prior_turns_sent_to_llm(self):
+        """Prior turns beyond CONVERSATION_WINDOW are excluded from the payload."""
+        from habittracker.core.config import CONVERSATION_WINDOW
+        mock_chat = MagicMock()
+        mock_chat.complete.return_value = "Answer."
+        node = make_generate_answer_node(mock_chat)
+
+        many_prior = []
+        for i in range(CONVERSATION_WINDOW + 4):
+            many_prior.append({"role": "user", "content": f"msg {i}"})
+            many_prior.append({"role": "assistant", "content": f"reply {i}"})
+
+        node(self._state_with_evidence(prior_messages=many_prior))
+
+        messages = mock_chat.complete.call_args[0][0]
+        # system + windowed prior + current user
+        prior_in_payload = [m for m in messages if m["role"] != "system"][:-1]
+        assert len(prior_in_payload) <= CONVERSATION_WINDOW
 
     def test_answer_truncated_at_max_len(self):
         long_answer = "x" * (MAX_ANSWER_LEN + 100)
         mock_chat = MagicMock()
         mock_chat.complete.return_value = long_answer
         node = make_generate_answer_node(mock_chat)
-        state = {
-            "evidence": self._evidence(),
-            "context_text": "Some context",
-            "message": "Tell me everything",
-        }
-        result = node(state)
+        result = node(self._state_with_evidence())
 
         assert len(result["answer"]) == MAX_ANSWER_LEN
 
@@ -218,12 +329,7 @@ class TestGenerateAnswerNode:
         mock_chat = MagicMock()
         mock_chat.complete.return_value = short_answer
         node = make_generate_answer_node(mock_chat)
-        state = {
-            "evidence": self._evidence(),
-            "context_text": "Pickups: 6",
-            "message": "Water?",
-        }
-        result = node(state)
+        result = node(self._state_with_evidence())
 
         assert result["answer"] == short_answer
 
