@@ -18,3 +18,4 @@ website/build/
 website/.docusaurus/
 website/.cache-loader/
 infra/local/.env
+infra/local/langfuse/.env
