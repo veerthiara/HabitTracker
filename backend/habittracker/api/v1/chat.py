@@ -29,6 +29,12 @@ session handling:
     state via msgpack; Session is not serialisable).
   - Session is injected via config["configurable"]["session"] and read by
     gather_context_node from the config argument.
+
+Langfuse tracing (optional):
+  - When LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_BASE_URL are
+    set, a Langfuse CallbackHandler is attached to each graph invocation.
+  - The handler auto-traces every LangGraph node (timing, inputs, outputs).
+  - When env vars are absent, tracing is silently disabled — zero overhead.
 """
 
 import logging
@@ -38,6 +44,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from habittracker.api.deps import get_current_user_id
+from habittracker.core.langfuse_integration import get_langfuse_callback_handler
 from habittracker.graph.builder import build_chat_graph
 from habittracker.models.repository.session import get_session
 from habittracker.providers.base import ChatCompletionError
@@ -93,6 +100,11 @@ def chat(
             "session": session,   # injected here; not stored in state
         }
     }
+
+    # Attach Langfuse callback handler when tracing is enabled.
+    langfuse_handler = get_langfuse_callback_handler()
+    if langfuse_handler is not None:
+        config["callbacks"] = [langfuse_handler]
 
     try:
         result = _graph.invoke(initial_state, config=config)
