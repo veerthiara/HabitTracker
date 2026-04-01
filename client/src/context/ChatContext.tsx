@@ -70,7 +70,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const closePanel = useCallback(() => { setIsOpen(false); setSelectedMessageId(null); }, []);
   const togglePanel = useCallback(() => setIsOpen((v) => !v), []);
 
-  const showEvidence = useCallback((id: string) => setSelectedMessageId(id), []);
+  const showEvidence = useCallback(
+    (id: string) => setSelectedMessageId((prev) => (prev === id ? null : id)),
+    [],
+  );
   const hideEvidence = useCallback(() => setSelectedMessageId(null), []);
 
   const clearThread = useCallback(() => {

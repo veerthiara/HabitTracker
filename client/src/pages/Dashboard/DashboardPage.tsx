@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "../../api/dashboard";
+import { useChat } from "../../context/ChatContext";
 import { TopBar } from "../../components/layout/TopBar";
+import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Spinner";
 import { SummaryCards } from "./components/SummaryCards";
 import { HabitsToday } from "./components/HabitsToday";
@@ -14,6 +16,7 @@ function todayISO() {
 
 export function DashboardPage() {
   const today = todayISO();
+  const { togglePanel } = useChat();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dashboard", today],
@@ -26,6 +29,11 @@ export function DashboardPage() {
       <TopBar
         title="Dashboard"
         subtitle={new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        action={
+          <Button variant="primary" onClick={togglePanel}>
+            ◐ Ask AI
+          </Button>
+        }
       />
       <div className={styles.content}>
         {isLoading && <Spinner center />}

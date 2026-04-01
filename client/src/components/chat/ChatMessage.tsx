@@ -17,7 +17,7 @@ const INTENT_LABELS: Record<string, string> = {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
-  const { showEvidence } = useChat();
+  const { showEvidence, selectedMessageId } = useChat();
 
   return (
     <div className={[styles.row, isUser ? styles.user : styles.assistant].join(" ")}>
@@ -48,7 +48,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             className={styles.evidenceBtn}
             onClick={() => showEvidence(message.id)}
           >
-            View Evidence ({message.evidence!.length})
+            {selectedMessageId === message.id
+              ? "Hide Evidence"
+              : `View Evidence (${message.evidence!.length})`}
           </button>
         )}
       </div>
