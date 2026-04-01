@@ -42,6 +42,10 @@ interface ChatState {
   togglePanel: () => void;
   sendMessage: (text: string) => Promise<void>;
   clearThread: () => void;
+  // Evidence drawer
+  selectedMessageId: string | null;
+  showEvidence: (id: string) => void;
+  hideEvidence: () => void;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -59,14 +63,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const threadIdRef = useRef<string | undefined>(undefined);
 
   const openPanel = useCallback(() => setIsOpen(true), []);
-  const closePanel = useCallback(() => setIsOpen(false), []);
+  const closePanel = useCallback(() => { setIsOpen(false); setSelectedMessageId(null); }, []);
   const togglePanel = useCallback(() => setIsOpen((v) => !v), []);
+
+  const showEvidence = useCallback((id: string) => setSelectedMessageId(id), []);
+  const hideEvidence = useCallback(() => setSelectedMessageId(null), []);
 
   const clearThread = useCallback(() => {
     setMessages([]);
+    setSelectedMessageId(null);
     threadIdRef.current = undefined;
   }, []);
 
@@ -120,6 +129,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         togglePanel,
         sendMessage,
         clearThread,
+        selectedMessageId,
+        showEvidence,
+        hideEvidence,
       }}
     >
       {children}

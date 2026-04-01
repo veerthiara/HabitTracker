@@ -1,3 +1,4 @@
+import { useChat } from "../../context/ChatContext";
 import type { ChatMessage as ChatMessageType } from "../../context/ChatContext";
 import { Badge } from "../ui/Badge";
 import styles from "./ChatMessage.module.css";
@@ -16,6 +17,7 @@ const INTENT_LABELS: Record<string, string> = {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const { showEvidence } = useChat();
 
   return (
     <div className={[styles.row, isUser ? styles.user : styles.assistant].join(" ")}>
@@ -39,6 +41,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className={styles.meta}>
             <Badge label="Error" color="danger" dot />
           </div>
+        )}
+
+        {!isUser && !message.error && (message.evidence?.length ?? 0) > 0 && (
+          <button
+            className={styles.evidenceBtn}
+            onClick={() => showEvidence(message.id)}
+          >
+            View Evidence ({message.evidence!.length})
+          </button>
         )}
       </div>
     </div>
