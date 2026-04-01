@@ -76,6 +76,13 @@
 }
 .navLabel { flex: 1; }
 
+/* Chat trigger button — sits between nav and footer */
+.chatBtn {
+  width: calc(100% - var(--space-3) * 2);
+  margin: var(--space-2) var(--space-3) 0;
+  text-align: left;
+}
+
 /* Footer / user */
 .footer {
   display: flex;
