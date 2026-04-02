@@ -1,4 +1,4 @@
-# Phase 07 Rev 01 — Langfuse Observability Integration
+# Phase 08 Rev 02 — Backend Langfuse Integration
 
 ## Goal
 
@@ -73,7 +73,7 @@ backend/habittracker/api/v1/chat.py
 backend/.env.example                                     ← new
 tests/habittracker/core/__init__.py                      ← new
 tests/habittracker/core/test_langfuse_integration.py     ← new
-docs/implementation/phase-07-rev01.md                    ← new
+docs/implementation/phase-08-rev02.md                    ← new (renamed from phase-07-rev01.md)
 ```
 
 ## Notes
@@ -85,6 +85,5 @@ docs/implementation/phase-07-rev01.md                    ← new
 
 ## Next Step
 
-- Connect Langfuse to a local self-hosted instance and verify traces appear for chat requests.
+- Run `make langfuse-up`, copy `infra/local/langfuse/.env.example` to `.env`, and verify traces appear in the Langfuse UI at `localhost:3000` after sending a chat message.
 - Consider adding Langfuse tracing to the embedding pipeline (`scripts/embed/`) for batch observability.
-- Phase 07 Rev 02 — UI polish: React frontend connected to live graph endpoint.
