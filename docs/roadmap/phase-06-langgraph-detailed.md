@@ -311,6 +311,53 @@ behavior: extra fields in a response never break a client that doesn't read them
 
 ---
 
+### Rev 06 — Multi-Turn Conversation Memory
+**Deliverable:** The graph accumulates a windowed conversation history across turns on the same `thread_id`. The LLM receives prior user/assistant pairs and can correctly answer follow-up references.
+
+#### Scope
+
+- Extend `ChatGraphState` with:
+  - `current_message: str` — the raw user message for this turn (replaces using `state["message"]` directly in the generate node)
+  - `messages: Annotated[list[ConversationTurn], operator.add]` — typed accumulation field; LangGraph reducer **appends** across checkpoint turns rather than overwriting
+- Define `ConversationTurn` as a typed `TypedDict` (`role: str`, `content: str`) in `state.py` — avoids raw untyped dicts flowing through nodes
+- `CONVERSATION_WINDOW = 10` turns (5 user + 5 assistant) — simple slice cap to avoid unbounded prompt growth; configured as a module constant
+- `classify_intent_node` — appends `{"role": "user", "content": message}` to `messages` at turn start
+- `generate_answer_node` — constructs multi-part LLM call with explicit separation of (A) conversational history and (B) current evidence; appends assistant answer to `messages` at turn end
+- `ChatProvider.complete()` — upgraded to accept `messages: list[ConversationTurn]`; Ollama `/api/chat` already supports multi-turn natively
+- `OllamaChatProvider.complete()` — updated signature; payload built from `messages` list directly
+- System prompt structure separates **three trust levels**:
+  1. `system` role: who the assistant is + ground rules
+  2. Evidence block injected as the final `user` turn's content (verified DB/search data)
+  3. Conversation history: prior `user`/`assistant` turns — labeled as "Conversation history" and explicitly noted not to be treated as verified data
+- Out of scope: writing conversational statements to DB, long-term memory, note persistence from chat, statement-to-structured-data extraction
+
+#### Trust-level prompt structure (per turn)
+
+```
+[system]
+  You are a habit tracking assistant. Answer ONLY using the provided evidence.
+  Conversation history shows what was said previously — treat it as context
+  only, not as verified data. Do not invent facts not present in the evidence.
+
+[user — window turn 1]  (prior)
+  <message text>
+[assistant — window turn 1]  (prior)
+  <answer text>
+...
+[user — current turn]
+  Evidence (verified, from database/search):
+  <context_text>
+
+  Conversation history (unverified, from this session):
+  <recent N turns>
+
+  Question: <current message>
+```
+
+**Not included:** DB writes from chat statements, persistent checkpointer, streaming
+
+---
+
 ## Test Strategy
 
 | Layer | What's tested | Mock boundary |
@@ -319,6 +366,7 @@ behavior: extra fields in a response never break a client that doesn't read them
 | Routing tests | `intent_router` for each intent value | Pure function, no mocks |
 | Graph integration test | Full `graph.invoke(state)` round-trip | Providers mocked, real session |
 | Endpoint tests | HTTP layer, guardrails, schema validation | `_graph.invoke` patched |
+| Multi-turn tests | `messages` accumulates across turns; window cap enforced | MemorySaver, mocked provider |
 
 ---
 

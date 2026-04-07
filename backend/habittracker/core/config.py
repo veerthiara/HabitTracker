@@ -16,6 +16,12 @@ Environment variables:
     OLLAMA_RETRY_BACKOFF_SEC — Initial backoff in seconds; doubles each retry (default: 1)
     EMBED_BATCH_SIZE         — Notes per commit batch in the pipeline (default: 50)
     EMBED_EXPECTED_DIMS      — Expected vector dimensions; mismatches are rejected (default: 768)
+
+Langfuse observability (optional — see core/langfuse_integration.py):
+    LANGFUSE_PUBLIC_KEY      — Langfuse project public key (required to enable)
+    LANGFUSE_SECRET_KEY      — Langfuse project secret key (required to enable)
+    LANGFUSE_BASE_URL        — Langfuse server URL (required; e.g. http://localhost:3000)
+    LANGFUSE_TRACING_ENABLED — Set to "false" to disable tracing (default: "true")
 """
 
 import os
@@ -36,3 +42,10 @@ OLLAMA_CHAT_TIMEOUT_SEC: float = float(os.getenv("OLLAMA_CHAT_TIMEOUT_SEC", "120
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 EMBED_BATCH_SIZE: int = int(os.getenv("EMBED_BATCH_SIZE", "50"))
 EMBED_EXPECTED_DIMS: int = int(os.getenv("EMBED_EXPECTED_DIMS", "768"))
+
+# ── Conversation memory ───────────────────────────────────────────────────────
+# Maximum number of ConversationTurn entries fed to the LLM per request.
+# Each user+assistant pair = 2 entries, so 10 entries = 5 prior exchanges.
+# Older turns remain in the MemorySaver checkpoint but are not sent to the LLM.
+# Override via the CONVERSATION_WINDOW env var to tune without code changes.
+CONVERSATION_WINDOW: int = int(os.getenv("CONVERSATION_WINDOW", "10"))

@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useChat } from "../../context/ChatContext";
 import styles from "./Sidebar.module.css";
 
 interface NavItem {
@@ -15,6 +16,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const { togglePanel, isOpen } = useChat();
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
@@ -37,6 +40,15 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Chat trigger — always visible at bottom of nav */}
+      <button
+        className={[styles.navItem, styles.chatBtn, isOpen ? styles.active : ""].join(" ")}
+        onClick={togglePanel}
+      >
+        <span className={styles.navIcon}>◐</span>
+        <span className={styles.navLabel}>Ask AI</span>
+      </button>
 
       <div className={styles.footer}>
         <div className={styles.userAvatar}>V</div>
