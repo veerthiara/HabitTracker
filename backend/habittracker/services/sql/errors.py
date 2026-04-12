@@ -33,3 +33,7 @@ class SqlGenerationError(SqlError):
 
 class SqlValidationError(SqlError):
     """Raised when generated SQL fails pre-execution validation checks."""
+
+
+class SqlAnswerError(SqlError):
+    """Raised when the LLM fails to produce an answer from the SQL results."""
