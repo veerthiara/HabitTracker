@@ -22,6 +22,10 @@ Langfuse observability (optional — see core/langfuse_integration.py):
     LANGFUSE_SECRET_KEY      — Langfuse project secret key (required to enable)
     LANGFUSE_BASE_URL        — Langfuse server URL (required; e.g. http://localhost:3000)
     LANGFUSE_TRACING_ENABLED — Set to "false" to disable tracing (default: "true")
+
+SQL analytics execution:
+    SQL_MAX_ROWS             — Hard row cap for analytics queries (default: 200)
+    SQL_STATEMENT_TIMEOUT_MS — Per-query Postgres timeout in ms (default: 5000)
 """
 
 import os
@@ -49,3 +53,12 @@ EMBED_EXPECTED_DIMS: int = int(os.getenv("EMBED_EXPECTED_DIMS", "768"))
 # Older turns remain in the MemorySaver checkpoint but are not sent to the LLM.
 # Override via the CONVERSATION_WINDOW env var to tune without code changes.
 CONVERSATION_WINDOW: int = int(os.getenv("CONVERSATION_WINDOW", "10"))
+
+# ── SQL analytics execution ───────────────────────────────────────────────────
+# Hard cap on result rows returned from analytics queries. Prevents the LLM
+# from receiving an arbitrarily large payload and keeps response latency low.
+SQL_MAX_ROWS: int = int(os.getenv("SQL_MAX_ROWS", "200"))
+
+# Per-query Postgres statement_timeout in milliseconds. Ensures a slow
+# generated query cannot stall the application server.
+SQL_STATEMENT_TIMEOUT_MS: int = int(os.getenv("SQL_STATEMENT_TIMEOUT_MS", "5000"))

@@ -21,9 +21,9 @@ would silently produce an incorrect LLM schema prompt:
 
 import pytest
 
-from habittracker.services.sql_schema_service import (
-    SCHEMA,
+from habittracker.services.sql.schema_service import (
     _TABLE_CONFIG,  # noqa: PLC2701 — deliberate white-box test
+    sql_schema_service,
 )
 
 
@@ -37,7 +37,7 @@ def _orm_columns(orm_class: type) -> set[str]:
 
 def _schema_columns(tablename: str) -> set[str]:
     """Return the column names present in the rendered SchemaContext."""
-    for table in SCHEMA.tables:
+    for table in sql_schema_service.schema.tables:
         if table.name == tablename:
             return {col.name for col in table.columns}
     return set()

@@ -75,7 +75,10 @@ embed-notes:
 	cd backend && poetry run python -m scripts.embed.main
 
 test-embed:
-	cd backend && poetry run pytest tests/scripts/embed/ -v
+	cd backend && poetry run pytest tests/habittracker/services/test_embedding_service.py tests/habittracker/models/repository/test_embedding_repository.py -v
+
+tests:
+	cd backend && poetry run pytest tests -v
 
 # ── Langfuse (local observability) ────────────────────────────────────────────
 
