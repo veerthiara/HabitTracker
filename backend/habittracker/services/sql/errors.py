@@ -29,3 +29,7 @@ class NonSelectStatementError(SqlError):
 
 class SqlGenerationError(SqlError):
     """Raised when the LLM fails to produce a usable SQL statement."""
+
+
+class SqlValidationError(SqlError):
+    """Raised when generated SQL fails pre-execution validation checks."""
