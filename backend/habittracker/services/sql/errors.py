@@ -25,3 +25,7 @@ class ForbiddenStatementError(SqlError):
 
 class NonSelectStatementError(SqlError):
     """Raised when the statement does not begin with SELECT."""
+
+
+class SqlGenerationError(SqlError):
+    """Raised when the LLM fails to produce a usable SQL statement."""
