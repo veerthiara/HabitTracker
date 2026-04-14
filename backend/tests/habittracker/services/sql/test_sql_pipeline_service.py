@@ -29,7 +29,7 @@ from habittracker.schemas.sql_chat import (
     SqlValidationResult,
     ValidationStatus,
 )
-from habittracker.services.sql.errors import SqlExecutionError, SqlGenerationError
+from habittracker.services.sql.errors import SqlAnswerError, SqlExecutionError, SqlGenerationError
 from habittracker.services.sql.pipeline_service import SqlPipelineService, sql_pipeline_service
 
 
@@ -84,6 +84,7 @@ def _make_pipeline(
     generation_result: SqlGenerationResult | Exception | None = None,
     validation_result: SqlValidationResult | None = None,
     execution_result: SqlExecutionResult | Exception | None = None,
+    answer_result: str | Exception = "You have 3 active habits.",
 ) -> SqlPipelineService:
     """Build a SqlPipelineService with fully mocked dependencies."""
     generation_svc = MagicMock()
@@ -101,10 +102,17 @@ def _make_pipeline(
     else:
         execution_svc.execute.return_value = execution_result or _make_execution_result()
 
+    answer_svc = MagicMock()
+    if isinstance(answer_result, Exception):
+        answer_svc.answer.side_effect = answer_result
+    else:
+        answer_svc.answer.return_value = answer_result
+
     return SqlPipelineService(
         generation_svc=generation_svc,
         validation_svc=validation_svc,
         execution_svc=execution_svc,
+        answer_svc=answer_svc,
     )
 
 
@@ -172,10 +180,12 @@ class TestGenerationFailure:
         gen_svc.generate.side_effect = SqlGenerationError("LLM error")
         val_svc = MagicMock()
         exec_svc = MagicMock()
+        answer_svc = MagicMock()
         svc = SqlPipelineService(
             generation_svc=gen_svc,
             validation_svc=val_svc,
             execution_svc=exec_svc,
+            answer_svc=answer_svc,
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -214,10 +224,12 @@ class TestValidationRejection:
         val_svc = MagicMock()
         val_svc.validate.return_value = _make_rejected_validation()
         exec_svc = MagicMock()
+        answer_svc = MagicMock()
         svc = SqlPipelineService(
             generation_svc=gen_svc,
             validation_svc=val_svc,
             execution_svc=exec_svc,
+            answer_svc=answer_svc,
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -278,6 +290,91 @@ class TestNeverRaises:
         else:
             svc = _make_pipeline(execution_result=exc)
         # Must not raise
+        result = svc.run(_make_request(), session=MagicMock())
+        assert isinstance(result, SqlPipelineResult)
+
+
+# ── Answer stage ─────────────────────────────────────────────────────────────
+
+
+class TestAnswerStage:
+
+    def test_answer_present_on_success(self) -> None:
+        svc = _make_pipeline(answer_result="You have 5 habits.")
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.answer == "You have 5 habits."
+
+    def test_answer_none_on_generation_failure(self) -> None:
+        svc = _make_pipeline(generation_result=SqlGenerationError("LLM error"))
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.answer is None
+
+    def test_answer_none_on_validation_rejection(self) -> None:
+        svc = _make_pipeline(validation_result=_make_rejected_validation())
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.answer is None
+
+    def test_answer_none_on_execution_failure(self) -> None:
+        svc = _make_pipeline(execution_result=SqlExecutionError("DB error"))
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.answer is None
+
+    def test_answer_failure_returns_failure_result(self) -> None:
+        svc = _make_pipeline(answer_result=SqlAnswerError("LLM unavailable"))
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.success is False
+        assert result.failure_reason is not None
+        assert "answer" in result.failure_reason.lower()
+
+    def test_answer_failure_preserves_execution_result(self) -> None:
+        exec_result = _make_execution_result()
+        svc = _make_pipeline(
+            execution_result=exec_result,
+            answer_result=SqlAnswerError("LLM timeout"),
+        )
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.execution is not None
+        assert result.execution.row_count == 1
+
+    def test_answer_svc_called_with_question_and_execution_result(self) -> None:
+        gen_svc = MagicMock()
+        gen_svc.generate.return_value = _make_generation_result()
+        val_svc = MagicMock()
+        val_svc.validate.return_value = _make_ok_validation()
+        exec_result = _make_execution_result()
+        exec_svc = MagicMock()
+        exec_svc.execute.return_value = exec_result
+        answer_svc = MagicMock()
+        answer_svc.answer.return_value = "Some answer."
+        svc = SqlPipelineService(
+            generation_svc=gen_svc,
+            validation_svc=val_svc,
+            execution_svc=exec_svc,
+            answer_svc=answer_svc,
+        )
+        request = _make_request(question="How many habits?")
+        svc.run(request, session=MagicMock())
+        answer_svc.answer.assert_called_once_with("How many habits?", exec_result)
+
+    def test_answer_svc_not_called_on_execution_failure(self) -> None:
+        gen_svc = MagicMock()
+        gen_svc.generate.return_value = _make_generation_result()
+        val_svc = MagicMock()
+        val_svc.validate.return_value = _make_ok_validation()
+        exec_svc = MagicMock()
+        exec_svc.execute.side_effect = SqlExecutionError("DB error")
+        answer_svc = MagicMock()
+        svc = SqlPipelineService(
+            generation_svc=gen_svc,
+            validation_svc=val_svc,
+            execution_svc=exec_svc,
+            answer_svc=answer_svc,
+        )
+        svc.run(_make_request(), session=MagicMock())
+        answer_svc.answer.assert_not_called()
+
+    def test_never_raises_on_answer_failure(self) -> None:
+        svc = _make_pipeline(answer_result=SqlAnswerError("LLM unavailable"))
         result = svc.run(_make_request(), session=MagicMock())
         assert isinstance(result, SqlPipelineResult)
 

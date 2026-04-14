@@ -99,3 +99,7 @@ class SqlPipelineResult(BaseModel):
         default=None,
         description="Short reason string when success=False.",
     )
+    answer: str | None = Field(
+        default=None,
+        description="Natural-language answer generated from the execution rows. None when the pipeline did not reach the answer stage.",
+    )

@@ -35,7 +35,8 @@ from habittracker.schemas.sql_chat import (
     SqlValidationResult,
     ValidationStatus,
 )
-from habittracker.services.sql.errors import SqlExecutionError, SqlGenerationError
+from habittracker.services.sql.answer_service import SqlAnswerService, sql_answer_service
+from habittracker.services.sql.errors import SqlAnswerError, SqlExecutionError, SqlGenerationError
 from habittracker.services.sql.execution_service import SqlExecutionService, sql_execution_service
 from habittracker.services.sql.generation_service import SqlGenerationService, sql_generation_service
 from habittracker.services.sql.validation_service import SqlValidationService, sql_validation_service
@@ -54,10 +55,12 @@ class SqlPipelineService:
         generation_svc: SqlGenerationService,
         validation_svc: SqlValidationService,
         execution_svc: SqlExecutionService,
+        answer_svc: SqlAnswerService,
     ) -> None:
         self._generation_svc = generation_svc
         self._validation_svc = validation_svc
         self._execution_svc = execution_svc
+        self._answer_svc = answer_svc
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -131,12 +134,27 @@ class SqlPipelineService:
                 failure_reason=f"SQL execution failed: {exc}",
             )
 
+        # ── Stage 4: answer ───────────────────────────────────────────────
+        try:
+            answer_text = self._answer_svc.answer(request.question, execution_result)
+        except SqlAnswerError as exc:
+            logger.warning("SQL answer generation failed: %s", exc)
+            return SqlPipelineResult(
+                question=request.question,
+                generated_sql=generated_sql,
+                validation=validation_result,
+                execution=execution_result,
+                success=False,
+                failure_reason=f"Answer generation failed: {exc}",
+            )
+
         return SqlPipelineResult(
             question=request.question,
             generated_sql=generated_sql,
             validation=validation_result,
             execution=execution_result,
             success=True,
+            answer=answer_text,
         )
 
 
@@ -146,4 +164,5 @@ sql_pipeline_service = SqlPipelineService(
     generation_svc=sql_generation_service,
     validation_svc=sql_validation_service,
     execution_svc=sql_execution_service,
+    answer_svc=sql_answer_service,
 )
