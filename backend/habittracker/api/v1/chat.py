@@ -88,6 +88,7 @@ def chat(
     Returns HTTP 503 if Ollama is unavailable or times out.
     """
     thread_id = request.thread_id or str(uuid.uuid4())
+    logger.info("chat request  thread=%s  message=%r", thread_id, request.message[:120])
 
     initial_state = {
         "user_id": user_id,
@@ -114,6 +115,14 @@ def chat(
             status_code=503,
             detail="Chat service unavailable. Ensure Ollama is running with the correct model.",
         ) from exc
+
+    logger.info(
+        "chat response thread=%s  intent=%s  used_notes=%s  answer_chars=%d",
+        thread_id,
+        result["intent"],
+        result.get("used_notes", False),
+        len(result["answer"]),
+    )
 
     return ChatResponse(
         answer=result["answer"],

@@ -133,7 +133,7 @@ def classify_intent_node(state: ChatGraphState) -> dict:
     writer of conversation history.
     """
     intent = classify_intent(state["current_message"])
-    logger.debug("classify_intent_node: intent=%s", intent)
+    logger.info("classify_intent_node: intent=%s", intent)
     return {"intent": str(intent)}
 
 
@@ -164,7 +164,7 @@ def make_gather_context_node(embed_provider: EmbeddingProvider):
             state["current_message"],
             embed_provider,
         )
-        logger.debug(
+        logger.info(
             "gather_context_node: evidence_count=%d used_notes=%s",
             len(context.evidence),
             context.used_notes,

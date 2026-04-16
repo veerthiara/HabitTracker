@@ -50,18 +50,25 @@ statement that answers the user's analytical question.
 
 Rules you must follow without exception:
 - Output ONLY the SQL statement. No explanation, no markdown, no code fences.
-- Always use :user_id as a bind parameter to filter by the authenticated user.
+- Always filter by the authenticated user. Write this EXACTLY: \
+  bottle_events.user_id = :user_id  (or whichever table you are querying). \
+  The WHERE clause must include  <table>.user_id = :user_id  with the column \
+  name, the equals sign, and the bind parameter. Never write just :user_id \
+  or %(user_id)s alone — that is a syntax error. \
+  Do NOT join the users table just to apply this filter.
 - Only reference tables and columns listed in the schema above.
 - Only SELECT statements are allowed.
 - Include a LIMIT clause unless the question explicitly asks for all rows.
 - Do not use INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, or REVOKE.
+- Do NOT use table aliases. Always write the full table name (e.g. \
+  bottle_events.volume_ml, habit_logs.logged_date). Aliases cause column \
+  reference errors — avoid them entirely.
 - If the question cannot be answered with the available schema, output exactly: \
 UNSUPPORTED
 """
 
 # Extracts SQL from a bare statement or a markdown code fence (```sql ... ``` or ``` ... ```)
 _CODE_FENCE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
-
 
 # ── Service class ─────────────────────────────────────────────────────────────
 

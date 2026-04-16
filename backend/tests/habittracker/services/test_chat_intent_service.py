@@ -130,11 +130,25 @@ class TestClassifyIntentGeneral:
 
 
 class TestClassifyIntentOrdering:
-    """Verify evaluation order: BOTTLE > HABIT > NOTE_PATTERN.
+    """Verify evaluation order: SQL_ANALYTICS > BOTTLE > HABIT > NOTE_PATTERN.
 
     When a message contains keywords from multiple intent groups, the
     higher-priority group wins.  This prevents surprising misrouting.
+
+    SQL_ANALYTICS is first because aggregation/time-range keywords are specific
+    enough to unambiguously signal analytics even when the message also mentions
+    domain entities (water, habit).  Simple lookup questions ("how much today?")
+    have no SQL keywords and still fall through to BOTTLE/HABIT.
     """
+
+    def test_sql_beats_bottle_when_analytical(self):
+        # "average", "last 30", "per day" are SQL keywords; "water" is bottle.
+        # SQL is checked first so SQL_ANALYTICS must win.
+        assert classify_intent("Tell me in last 30 days average water drank per day") == ChatIntent.SQL_ANALYTICS
+
+    def test_sql_beats_habit_when_analytical(self):
+        # "average" + "per day" override "habit".
+        assert classify_intent("What is my average habit completion per day this month?") == ChatIntent.SQL_ANALYTICS
 
     def test_bottle_beats_habit_when_both_present(self):
         # "water" is a bottle keyword — should win even if "habit" is also present.
@@ -144,7 +158,7 @@ class TestClassifyIntentOrdering:
         assert classify_intent("Why is my water intake low?") == ChatIntent.BOTTLE_ACTIVITY
 
     def test_habit_beats_pattern_when_both_present(self):
-        # "habit" should win over "why" since habit is checked first.
+        # "habit" should win over "why" since habit is checked before pattern.
         assert classify_intent("Why did I miss my habit today?") == ChatIntent.HABIT_SUMMARY
 
 

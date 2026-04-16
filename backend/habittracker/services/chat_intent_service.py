@@ -57,16 +57,11 @@ _HABIT_KEYWORDS: tuple[str, ...] = (
     "streak",
 )
 
-# Checked third — needs semantic (pgvector) search over notes.
-_PATTERN_KEYWORDS: tuple[str, ...] = (
-    "why", "pattern", "trend", "reason", "notice",
-    "tend ", "tendency", "explain", "often", "usually",
-    "always", "never", "most of the time",
-)
-
-# Checked fourth — ad hoc analytical questions best answered by generated SQL.
-# These signal grouping, aggregation, comparison, or ranking that is not
-# already handled by the repository path.
+# Checked first (after UNSUPPORTED) — ad hoc analytical questions best answered
+# by generated SQL. SQL keywords are specific enough (aggregation, time ranges,
+# comparisons) that they must be checked BEFORE bottle/habit keywords to avoid
+# losing questions like "average water per day over the last 30 days" to the
+# lower-precision bottle path.
 _SQL_ANALYTICS_KEYWORDS: tuple[str, ...] = (
     "which day", "which week", "which month",
     "average", "avg", "total",
@@ -78,6 +73,26 @@ _SQL_ANALYTICS_KEYWORDS: tuple[str, ...] = (
     "over the last", "in the last", "past 7", "past 30", "last 7", "last 30",
 )
 
+# Checked second — exact-count / time-based hydration questions.
+_BOTTLE_KEYWORDS: tuple[str, ...] = (
+    "bottle", "water", "hydrat", "drink", "drinking",
+    " ml", "litre", "liter", "fluid",
+)
+
+# Checked third — structured habit / routine / streak queries.
+_HABIT_KEYWORDS: tuple[str, ...] = (
+    "habit", "routine", "check in", "checkin",
+    "complete", "completed", "done today", "tracked", "tracking",
+    "streak",
+)
+
+# Checked fourth — needs semantic (pgvector) search over notes.
+_PATTERN_KEYWORDS: tuple[str, ...] = (
+    "why", "pattern", "trend", "reason", "notice",
+    "tend ", "tendency", "explain", "often", "usually",
+    "always", "never", "most of the time",
+)
+
 
 # ── Classifier ────────────────────────────────────────────────────────────────
 
@@ -85,7 +100,12 @@ def classify_intent(message: str) -> ChatIntent:
     """Classify a user message into a ChatIntent.
 
     Evaluation order (first match wins):
-      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → SQL_ANALYTICS → GENERAL
+      UNSUPPORTED → SQL_ANALYTICS → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → GENERAL
+
+    SQL_ANALYTICS is intentionally checked before BOTTLE/HABIT so that
+    aggregation questions containing domain keywords ("average water per day",
+    "compare hydration this week vs last week") route to the SQL path rather
+    than the lower-precision repository path.
 
     Args:
         message: The raw user input.
@@ -108,6 +128,9 @@ def classify_intent(message: str) -> ChatIntent:
     if words and words <= _UNSUPPORTED_PHRASES:
         return ChatIntent.UNSUPPORTED
 
+    if any(kw in msg for kw in _SQL_ANALYTICS_KEYWORDS):
+        return ChatIntent.SQL_ANALYTICS
+
     if any(kw in msg for kw in _BOTTLE_KEYWORDS):
         return ChatIntent.BOTTLE_ACTIVITY
 
@@ -116,9 +139,6 @@ def classify_intent(message: str) -> ChatIntent:
 
     if any(kw in msg for kw in _PATTERN_KEYWORDS):
         return ChatIntent.NOTE_PATTERN
-
-    if any(kw in msg for kw in _SQL_ANALYTICS_KEYWORDS):
-        return ChatIntent.SQL_ANALYTICS
 
     # Fallback — do not classify as UNSUPPORTED for legitimate questions
     # that simply use unexpected wording.  The general handler uses
