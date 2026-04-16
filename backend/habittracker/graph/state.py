@@ -37,6 +37,7 @@ from typing_extensions import TypedDict
 
 from habittracker.schemas.chat import EvidenceItem
 from habittracker.schemas.conversation import ConversationTurn  # noqa: F401 — re-exported
+from habittracker.schemas.sql_chat import SqlPipelineResult
 
 
 class ChatGraphState(TypedDict):
@@ -59,6 +60,10 @@ class ChatGraphState(TypedDict):
 
     Output field — written by generate_answer_node:
         answer:           Natural-language answer (or safe fallback).
+
+    Output field — written by sql_analytics_node (SQL_ANALYTICS intent only):
+        sql_pipeline_result: Full SqlPipelineResult from the SQL pipeline.
+                          None for all non-SQL intents.
 
     Conversation memory — appended by generate_answer_node only:
         messages:         Accumulated list of completed ConversationTurn pairs
@@ -91,6 +96,9 @@ class ChatGraphState(TypedDict):
     # operator.add reducer: each node return that includes "messages" is
     # concatenated onto the existing list by LangGraph.
     messages: Annotated[list[ConversationTurn], operator.add]
+
+    # ── Populated by sql_analytics_node (SQL_ANALYTICS intent only) ─────────────
+    sql_pipeline_result: SqlPipelineResult | None
 
     # ── Scaffolding — Phase 07 ────────────────────────────────────────────────
     clarify: str | None

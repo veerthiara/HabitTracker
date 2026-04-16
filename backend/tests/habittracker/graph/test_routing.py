@@ -5,6 +5,7 @@ call with a state dict and an assertion on the return value.
 
 Coverage:
   - UNSUPPORTED → "generate_answer"  (skips context gathering)
+  - SQL_ANALYTICS → "sql_analytics"  (skips context, runs SQL pipeline)
   - BOTTLE_ACTIVITY → "gather_context"
   - HABIT_SUMMARY → "gather_context"
   - NOTE_PATTERN → "gather_context"
@@ -19,6 +20,7 @@ from habittracker.schemas.intent import ChatIntent
 
 @pytest.mark.parametrize("intent,expected", [
     (ChatIntent.UNSUPPORTED,     "generate_answer"),
+    (ChatIntent.SQL_ANALYTICS,   "sql_analytics"),
     (ChatIntent.BOTTLE_ACTIVITY, "gather_context"),
     (ChatIntent.HABIT_SUMMARY,   "gather_context"),
     (ChatIntent.NOTE_PATTERN,    "gather_context"),
@@ -33,6 +35,12 @@ def test_intent_router_unsupported_string():
     """Verify UNSUPPORTED as a plain string also routes correctly."""
     state = {"intent": "unsupported"}
     assert intent_router(state) == "generate_answer"
+
+
+def test_intent_router_sql_analytics_string():
+    """Verify sql_analytics as a plain string routes to sql_analytics."""
+    state = {"intent": "sql_analytics"}
+    assert intent_router(state) == "sql_analytics"
 
 
 def test_intent_router_bottle_string():

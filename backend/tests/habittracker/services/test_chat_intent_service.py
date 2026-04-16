@@ -86,6 +86,38 @@ class TestClassifyIntentNotePattern:
         assert classify_intent("What do I usually say after a bad day?") == ChatIntent.NOTE_PATTERN
 
 
+class TestClassifyIntentSqlAnalytics:
+    def test_which_day_routes_to_sql(self):
+        # No bottle or habit keyword — "which day" alone routes to SQL_ANALYTICS.
+        assert classify_intent("Which day had the highest overall activity?") == ChatIntent.SQL_ANALYTICS
+
+    def test_average_keyword(self):
+        assert classify_intent("What is my average daily completion per week?") == ChatIntent.SQL_ANALYTICS
+
+    def test_compare_keyword(self):
+        assert classify_intent("Compare this week vs last week") == ChatIntent.SQL_ANALYTICS
+
+    def test_top_keyword(self):
+        assert classify_intent("What are the top performing days this month?") == ChatIntent.SQL_ANALYTICS
+
+    def test_by_weekday(self):
+        assert classify_intent("Show my activity broken down by weekday") == ChatIntent.SQL_ANALYTICS
+
+    def test_highest_keyword(self):
+        assert classify_intent("Which day has the highest completion rate?") == ChatIntent.SQL_ANALYTICS
+
+    def test_breakdown_keyword(self):
+        assert classify_intent("Give me a breakdown of my daily activity") == ChatIntent.SQL_ANALYTICS
+
+    def test_over_the_last_keyword(self):
+        assert classify_intent("How many logs over the last 30 days?") == ChatIntent.SQL_ANALYTICS
+
+    def test_most_often_keyword(self):
+        # "often" alone (NOTE_PATTERN) is checked before SQL, so test a
+        # clean SQL-only keyword instead.
+        assert classify_intent("How many logs do I make per week?") == ChatIntent.SQL_ANALYTICS
+
+
 class TestClassifyIntentGeneral:
     def test_unknown_question_falls_back_to_general(self):
         assert classify_intent("Tell me something about my progress") == ChatIntent.GENERAL

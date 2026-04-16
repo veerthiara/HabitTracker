@@ -44,8 +44,10 @@ import logging
 from habittracker.core.config import CONVERSATION_WINDOW
 from habittracker.graph.state import ChatGraphState
 from habittracker.providers.base import ChatProvider, EmbeddingProvider
+from habittracker.schemas.chat import EvidenceItem
 from habittracker.schemas.conversation import ConversationTurn
 from habittracker.schemas.intent import ChatIntent
+from habittracker.schemas.sql_chat import SqlGenerationRequest
 from habittracker.services.chat_context_service import gather_context
 from habittracker.services.chat_intent_service import classify_intent
 from habittracker.services.chat_service import (
@@ -53,6 +55,7 @@ from habittracker.services.chat_service import (
     MAX_ANSWER_LEN,
     SYSTEM_PROMPT,
 )
+from habittracker.services.sql.pipeline_service import SqlPipelineService, sql_pipeline_service
 
 logger = logging.getLogger(__name__)
 
@@ -240,3 +243,72 @@ def make_generate_answer_node(chat_provider: ChatProvider):
         }
 
     return generate_answer_node
+
+
+# ── Node 4: SQL analytics ─────────────────────────────────────────────────────
+
+def make_sql_analytics_node(pipeline_svc: SqlPipelineService):
+    """Factory that returns a sql_analytics_node closed over pipeline_svc.
+
+    The returned node:
+      Reads:  state["user_id"], state["current_message"]
+              config["configurable"]["session"]  ← injected; not in state
+      Writes: state["answer"], state["evidence"], state["context_text"],
+              state["used_notes"], state["sql_pipeline_result"],
+              state["messages"]
+
+    The node runs the full SQL pipeline (generation → validation →
+    execution → answer) and writes its output directly to the state fields
+    that generate_answer_node would normally populate.  This means the
+    SQL analytics path terminates at this node — generate_answer_node is
+    NOT called (the edge goes sql_analytics → END).
+
+    On pipeline failure, a safe fallback answer is returned and success=False
+    is recorded in sql_pipeline_result.  The node never raises.
+    """
+
+    def sql_analytics_node(state: ChatGraphState, config) -> dict:
+        session = (config or {}).get("configurable", {}).get("session")
+        current_message = state["current_message"]
+        user_id = state["user_id"]
+
+        request = SqlGenerationRequest(
+            question=current_message,
+            user_id=str(user_id),
+        )
+        result = pipeline_svc.run(request, session)
+
+        if result.success and result.answer:
+            answer = result.answer
+            # Build evidence items from execution result rows (up to 5 rows).
+            evidence: list[EvidenceItem] = []
+            if result.execution:
+                for row in result.execution.rows[:5]:
+                    label = " | ".join(str(v) for v in row.values())
+                    evidence.append(
+                        EvidenceItem(type="sql_result", label=label, value=label)
+                    )
+        else:
+            answer = result.failure_reason or FALLBACK_ANSWER
+            evidence = []
+
+        logger.info(
+            "sql_analytics_node: success=%s answer_chars=%d evidence_count=%d",
+            result.success,
+            len(answer),
+            len(evidence),
+        )
+
+        return {
+            "answer": answer,
+            "evidence": evidence,
+            "context_text": "",
+            "used_notes": False,
+            "sql_pipeline_result": result,
+            "messages": [
+                ConversationTurn(role="user", content=current_message),
+                ConversationTurn(role="assistant", content=answer),
+            ],
+        }
+
+    return sql_analytics_node

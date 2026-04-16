@@ -6,6 +6,7 @@ classified intent and returns the name of the next node to execute.
 
 Routing table:
   UNSUPPORTED   → "generate_answer"   (skip context — return fallback)
+  SQL_ANALYTICS → "sql_analytics"     (skip context — SQL pipeline handles everything)
   All others    → "gather_context"    (fetch evidence, then generate)
 
 Keeping routing in its own module:
@@ -29,8 +30,11 @@ def intent_router(state: ChatGraphState) -> str:
 
     Returns:
         "generate_answer" for UNSUPPORTED intent (skips context gathering).
+        "sql_analytics"   for SQL_ANALYTICS intent (SQL pipeline handles answer).
         "gather_context"  for all other intents.
     """
     if state["intent"] == ChatIntent.UNSUPPORTED:
         return "generate_answer"
+    if state["intent"] == ChatIntent.SQL_ANALYTICS:
+        return "sql_analytics"
     return "gather_context"

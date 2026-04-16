@@ -18,9 +18,11 @@ from habittracker.graph.nodes import (
     classify_intent_node,
     make_gather_context_node,
     make_generate_answer_node,
+    make_sql_analytics_node,
 )
 from habittracker.schemas.chat import EvidenceItem
 from habittracker.schemas.intent import ChatIntent
+from habittracker.schemas.sql_chat import SqlExecutionResult, SqlPipelineResult, SqlValidationResult, ValidationStatus
 from habittracker.services.chat_context_service import ChatContextResult
 from habittracker.services.chat_service import FALLBACK_ANSWER, MAX_ANSWER_LEN
 
@@ -356,3 +358,115 @@ class TestBuildChatGraph:
         assert "classify_intent" in node_names
         assert "gather_context" in node_names
         assert "generate_answer" in node_names
+        assert "sql_analytics" in node_names
+
+
+# ── sql_analytics_node ────────────────────────────────────────────────────────
+
+class TestSqlAnalyticsNode:
+    """sql_analytics_node runs the full SQL pipeline and writes the answer
+    directly to state — bypassing gather_context and generate_answer nodes.
+    """
+
+    def _state(self) -> dict:
+        return {
+            "user_id": uuid.uuid4(),
+            "current_message": "Which day had the most bottle pickups?",
+        }
+
+    def _config(self):
+        return {"configurable": {"session": MagicMock()}}
+
+    def _make_ok_result(self, answer: str = "Tuesday had the most.") -> SqlPipelineResult:
+        validation = SqlValidationResult(status=ValidationStatus.OK, sql="SELECT 1")
+        execution = SqlExecutionResult(columns=["day", "count"], rows=[{"day": "Tuesday", "count": 8}], row_count=1, sql="SELECT 1")
+        return SqlPipelineResult(
+            question="Which day?",
+            generated_sql="SELECT 1",
+            validation=validation,
+            execution=execution,
+            success=True,
+            answer=answer,
+        )
+
+    def _make_failed_result(self, reason: str = "SQL generation failed") -> SqlPipelineResult:
+        validation = SqlValidationResult(status=ValidationStatus.REJECTED, sql="", rejection_reason=reason)
+        return SqlPipelineResult(
+            question="Which day?",
+            generated_sql="",
+            validation=validation,
+            success=False,
+            failure_reason=reason,
+        )
+
+    def test_success_writes_answer(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result("Tuesday had the most.")
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert result["answer"] == "Tuesday had the most."
+
+    def test_success_sets_used_notes_false(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result()
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert result["used_notes"] is False
+
+    def test_success_builds_evidence_from_rows(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result()
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert len(result["evidence"]) == 1
+        assert result["evidence"][0].type == "sql_result"
+
+    def test_failure_uses_failure_reason_as_answer(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_failed_result("SQL generation failed")
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert result["answer"] == "SQL generation failed"
+
+    def test_failure_evidence_is_empty(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_failed_result()
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert result["evidence"] == []
+
+    def test_sql_pipeline_result_stored_in_state(self) -> None:
+        pipeline_svc = MagicMock()
+        ok = self._make_ok_result()
+        pipeline_svc.run.return_value = ok
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert result["sql_pipeline_result"] is ok
+
+    def test_appends_both_conversation_turns(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result("Tuesday.")
+        node = make_sql_analytics_node(pipeline_svc)
+        result = node(self._state(), self._config())
+        assert len(result["messages"]) == 2
+        assert result["messages"][0]["role"] == "user"
+        assert result["messages"][1]["role"] == "assistant"
+        assert result["messages"][1]["content"] == "Tuesday."
+
+    def test_pipeline_called_with_correct_question(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result()
+        node = make_sql_analytics_node(pipeline_svc)
+        state = self._state()
+        node(state, self._config())
+        call_request = pipeline_svc.run.call_args[0][0]
+        assert call_request.question == state["current_message"]
+
+    def test_pipeline_called_with_user_id(self) -> None:
+        pipeline_svc = MagicMock()
+        pipeline_svc.run.return_value = self._make_ok_result()
+        node = make_sql_analytics_node(pipeline_svc)
+        state = self._state()
+        node(state, self._config())
+        call_request = pipeline_svc.run.call_args[0][0]
+        assert call_request.user_id == str(state["user_id"])

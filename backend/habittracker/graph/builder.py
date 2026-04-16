@@ -31,10 +31,12 @@ from habittracker.graph.nodes import (
     classify_intent_node,
     make_gather_context_node,
     make_generate_answer_node,
+    make_sql_analytics_node,
 )
 from habittracker.graph.routing import intent_router
 from habittracker.graph.state import ChatGraphState
 from habittracker.providers.base import ChatProvider, EmbeddingProvider
+from habittracker.services.sql.pipeline_service import sql_pipeline_service
 
 
 def build_chat_graph(
@@ -65,18 +67,25 @@ def build_chat_graph(
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("gather_context", make_gather_context_node(embed_provider))
     graph.add_node("generate_answer", make_generate_answer_node(chat_provider))
+    graph.add_node("sql_analytics", make_sql_analytics_node(sql_pipeline_service))
 
     # ── Edges ─────────────────────────────────────────────────────────────────
     # Entry point
     graph.add_edge(START, "classify_intent")
 
-    # Conditional branch: UNSUPPORTED skips context gathering
+    # Conditional branch:
+    #   UNSUPPORTED   → generate_answer (skip context)
+    #   SQL_ANALYTICS → sql_analytics   (SQL pipeline, no context gathering)
+    #   all others    → gather_context
     graph.add_conditional_edges("classify_intent", intent_router)
 
     # Happy path: context → answer
     graph.add_edge("gather_context", "generate_answer")
 
-    # Terminal edge
+    # SQL analytics path terminates directly at END
+    graph.add_edge("sql_analytics", END)
+
+    # Terminal edge for the standard path
     graph.add_edge("generate_answer", END)
 
     return graph.compile(checkpointer=checkpointer)

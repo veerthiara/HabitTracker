@@ -64,6 +64,20 @@ _PATTERN_KEYWORDS: tuple[str, ...] = (
     "always", "never", "most of the time",
 )
 
+# Checked fourth — ad hoc analytical questions best answered by generated SQL.
+# These signal grouping, aggregation, comparison, or ranking that is not
+# already handled by the repository path.
+_SQL_ANALYTICS_KEYWORDS: tuple[str, ...] = (
+    "which day", "which week", "which month",
+    "average", "avg", "total",
+    "top ", "most often", "least often", "most frequent", "least frequent",
+    "compare", "vs", "versus", "per day", "per week", "per month",
+    " rank", "ranking",
+    "best day", "worst day", "highest", "lowest",
+    "breakdown", "by weekday", "by day", "by week", "by month",
+    "over the last", "in the last", "past 7", "past 30", "last 7", "last 30",
+)
+
 
 # ── Classifier ────────────────────────────────────────────────────────────────
 
@@ -71,7 +85,7 @@ def classify_intent(message: str) -> ChatIntent:
     """Classify a user message into a ChatIntent.
 
     Evaluation order (first match wins):
-      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → GENERAL
+      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → SQL_ANALYTICS → GENERAL
 
     Args:
         message: The raw user input.
@@ -102,6 +116,9 @@ def classify_intent(message: str) -> ChatIntent:
 
     if any(kw in msg for kw in _PATTERN_KEYWORDS):
         return ChatIntent.NOTE_PATTERN
+
+    if any(kw in msg for kw in _SQL_ANALYTICS_KEYWORDS):
+        return ChatIntent.SQL_ANALYTICS
 
     # Fallback — do not classify as UNSUPPORTED for legitimate questions
     # that simply use unexpected wording.  The general handler uses
