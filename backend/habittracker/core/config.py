@@ -40,7 +40,7 @@ OLLAMA_EMBED_MODEL: str = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 OLLAMA_TIMEOUT_SEC: float = float(os.getenv("OLLAMA_TIMEOUT_SEC", "60"))
 
 # ── Ollama — chat/completion ──────────────────────────────────────────────────
-OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
+OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5-coder:7b")
 OLLAMA_CHAT_TIMEOUT_SEC: float = float(os.getenv("OLLAMA_CHAT_TIMEOUT_SEC", "120"))
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────

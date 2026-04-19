@@ -278,6 +278,181 @@ Make the SQL path safe and testable.
 
 ---
 
+### Rev 08 — Structured intent extraction and template-backed SQL
+
+#### Goal
+Reduce free-form SQL generation for common analytics questions by routing them
+through fixed, pre-validated SQL templates. Only truly novel questions fall
+through to the LLM generator.
+
+#### Motivation
+Small local LLMs reliably misuse table aliases, omit the column name in the
+`user_id` filter, or join unnecessary tables. The root cause is that free-form
+generation requires the model to get *every* syntactic detail right. Fixed
+templates remove all of that risk for the question families users ask most often.
+
+#### Scope
+- Define a `SqlAnalyticsIntent` enum covering common question families:
+  - `TOTAL_METRIC` — total amount over a time window (e.g. total ml this week)
+  - `AVERAGE_PER_DAY` — average per calendar day over a window
+  - `COUNT_LOGS` — number of rows/events over a window
+  - `DAILY_TREND` — per-day breakdown over a window
+  - `TOP_DAY` — which single day had the most/least of a metric
+  - `HABIT_COMPLETION_RATE` — % of days a habit was completed
+  - `COMPARE_PERIODS` — this week vs last week, this month vs last month
+  - `UNKNOWN` — does not match any template; falls back to LLM generation
+- Add a `SqlIntentClassifier` that maps a natural-language question to one of the
+  above intents by keyword matching (same approach as `chat_intent_service` —
+  fast, no LLM call).
+- Add a `SqlParameterExtractor` that uses the LLM to extract a small structured
+  payload from the question:
+  - `table` — which table to query (`bottle_events`, `habit_logs`, …)
+  - `metric` — which column to aggregate (`volume_ml`, `id`, …)
+  - `interval` — time window in days (7, 30, 90, or null)
+  - `grouping` — optional group-by column (`DATE(event_ts)`, `logged_date`, …)
+  This is a narrowly-scoped extraction task (JSON output only), far less error-prone
+  than generating full SQL.
+- Add a `SqlTemplateRenderer` that takes an intent + parameters and returns a
+  fully-formed, alias-free, parameterised SQL string. All templates:
+  - use full table names (no `AS` aliases)
+  - include `<table>.user_id = :user_id`
+  - include `LIMIT`
+- Wire the new path in `SqlPipelineService`:
+  1. classify intent
+  2. if known → extract parameters → render template → validate → execute
+  3. if `UNKNOWN` → existing LLM generation → validate → execute
+
+#### Deliverable
+- Common analytics questions produce template-rendered SQL, not LLM-generated SQL
+- Free-form generation is a clearly-labelled fallback, not the primary path
+
+#### Files (new)
+- `services/sql/intent_classifier.py`
+- `services/sql/parameter_extractor.py`
+- `services/sql/template_renderer.py`
+- `schemas/sql_template.py`
+- `tests/habittracker/services/sql/test_sql_intent_classifier.py`
+- `tests/habittracker/services/sql/test_sql_template_renderer.py`
+- `tests/habittracker/services/sql/test_sql_parameter_extractor.py`
+
+#### Files (modified)
+- `services/sql/pipeline_service.py` — wire new path before fallback
+- `schemas/sql_chat.py` — add `generation_method` field (template | llm) to result
+
+---
+
+### Rev 09 — SQL schema grounding and stricter validation
+
+#### Goal
+Prevent schema hallucinations from reaching Postgres by checking generated SQL
+against known-good column metadata before execution.
+
+#### Scope
+- Extend `SqlValidationService` with two new checks:
+  - `_check_no_aliases` — reject any SQL that contains ` AS ` (alias declaration)
+    except inside aggregate expressions (`COUNT(*) AS n` is allowed; `FROM t AS x`
+    is not)
+  - `_check_known_columns` — for every `<table>.<column>` reference in the SQL,
+    verify both the table and column exist in `SchemaContext`. Reject with a
+    descriptive message listing the unknown references.
+- Add `_check_user_id_filter` — reject SQL that does not contain
+  `<approved_table>.user_id = :user_id` for at least one of the tables in the
+  FROM clause.
+- Make `SchemaContext` expose a `column_set` computed property:
+  `{(table_name, col_name), …}` for O(1) lookups in the validator.
+- Update the pipeline so validation failures trigger the repair loop (Rev 10)
+  rather than returning a hard error to the user.
+
+#### Deliverable
+- Schema hallucinations (wrong column names, wrong table references, missing
+  user_id filter) are caught before execution and never reach Postgres
+
+#### Files (modified)
+- `schemas/sql_schema.py` — `column_set` property on `SchemaContext`
+- `services/sql/validation_service.py` — three new check methods; all wired into `validate()`
+- `tests/habittracker/services/sql/test_sql_validation_service.py` — new cases for each check
+
+---
+
+### Rev 10 — One-pass repair loop for execution failures
+
+#### Goal
+Recover safely from predictable SQL mistakes without crashing the chat flow.
+
+#### Scope
+- Add a `SqlRepairService` that accepts:
+  - original question
+  - failed SQL
+  - DB error message
+  - schema summary
+  Returns repaired SQL text (LLM call) or raises `SqlRepairError` if the model
+  cannot fix it.
+- Repair prompt includes:
+  - the schema
+  - the failed SQL
+  - the exact DB error string
+  - an explicit instruction to produce only the corrected SELECT
+- Repair result is passed through the full validation pipeline before execution.
+- Retry is attempted **once only**. A second failure returns a user-facing
+  fallback ("I wasn't able to answer that question reliably — please try
+  rephrasing.").
+- `SqlPipelineResult` gains two new fields: `repair_attempted: bool` and
+  `repair_error: str | None`.
+- Both attempts (original SQL + repaired SQL) are logged at `WARNING` level with
+  the DB error so they are visible in Langfuse.
+
+#### Deliverable
+- Transient LLM mistakes that produce invalid SQL are retried once automatically
+- Users never see a raw Postgres error
+- Both attempts are observable in logs
+
+#### Files (new)
+- `services/sql/repair_service.py`
+- `services/sql/errors.py` — add `SqlRepairError`
+- `tests/habittracker/services/sql/test_sql_repair_service.py`
+
+#### Files (modified)
+- `services/sql/pipeline_service.py` — catch execution errors, invoke repair, retry
+- `schemas/sql_chat.py` — `repair_attempted`, `repair_error` fields
+
+---
+
+### Rev 11 — Evaluation set and regression harness
+
+#### Goal
+Make model changes measurable so future prompt edits or model swaps can be
+evaluated against a fixed baseline rather than ad hoc manual testing.
+
+#### Scope
+- Create a fixture file `tests/fixtures/sql_eval_questions.json` containing at
+  least 20 natural-language questions with:
+  - `question` — the user's input
+  - `expected_intent` — `SqlAnalyticsIntent` enum value
+  - `expected_tables` — list of tables the SQL must reference
+  - `expected_columns` — list of columns the SQL must reference
+  - `must_not_contain` — patterns that must not appear (e.g. `" AS T"`, `"users"`)
+- Add a pytest module `tests/habittracker/services/sql/test_sql_eval.py` that:
+  - parametrizes over the fixture file
+  - runs the full pipeline (generation → validation only, no DB) against a mock
+    provider that returns pre-recorded LLM outputs
+  - asserts intent classification, table/column presence, and forbidden patterns
+- Add a `make sql-eval` Makefile target that runs only the eval suite.
+- Designed so that swapping the Ollama model (Llama 3.2 → Qwen 2.5 Coder) is one
+  config line change and re-running `make sql-eval` shows a pass/fail delta.
+
+#### Deliverable
+- Regression harness that catches prompt regressions before they reach
+  production
+- Baseline pass rate recorded for current model so future changes have a
+  reference point
+
+#### Files (new)
+- `tests/fixtures/sql_eval_questions.json`
+- `tests/habittracker/services/sql/test_sql_eval.py`
+- `Makefile` — `sql-eval` target
+
+---
+
 ## Suggested Routing Policy
 
 ### Use repository path for:

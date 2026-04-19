@@ -56,6 +56,15 @@ class SchemaContext(BaseModel):
         """Derive the allowed table set directly from the table list."""
         return frozenset(t.name for t in self.tables)
 
+    @property
+    def column_set(self) -> frozenset[tuple[str, str]]:
+        """Set of (table_name, column_name) pairs for O(1) lookup in the validator."""
+        return frozenset(
+            (table.name, col.name)
+            for table in self.tables
+            for col in table.columns
+        )
+
     def is_table_allowed(self, table_name: str) -> bool:
         return table_name.lower() in self.allowed_tables
 

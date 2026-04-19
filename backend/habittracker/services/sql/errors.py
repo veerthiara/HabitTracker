@@ -37,3 +37,11 @@ class SqlValidationError(SqlError):
 
 class SqlAnswerError(SqlError):
     """Raised when the LLM fails to produce an answer from the SQL results."""
+
+
+class SqlTemplateError(SqlError):
+    """Raised when no fixed SQL template exists for the given intent."""
+
+
+class SqlParameterExtractionError(SqlError):
+    """Raised when the LLM fails to extract structured parameters from the question."""

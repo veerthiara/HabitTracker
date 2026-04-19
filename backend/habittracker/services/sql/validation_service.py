@@ -40,6 +40,30 @@ _TABLE_REF = re.compile(
 # Detects a semicolon that is NOT at the very end of the trimmed statement.
 _MULTIPLE_STATEMENTS = re.compile(r";.+", re.DOTALL)
 
+# Matches alias declarations of the form:  <table_name> AS <alias>
+# We allow  COUNT(*) AS n  and similar aggregate aliases, but not table aliases.
+# Strategy: match <word> AS <word> when the left side is a known table pattern
+# (has an underscore or is purely alpha and long — i.e. looks like a table name
+# rather than an expression).  Simpler and safer: reject any <word> AS <word>
+# where the left token does NOT contain '(' (so aggregate aliases are fine).
+_TABLE_ALIAS = re.compile(
+    r'\b([a-zA-Z_][a-zA-Z0-9_]*)\s+AS\s+[a-zA-Z_][a-zA-Z0-9_]*\b',
+    re.IGNORECASE,
+)
+
+# Matches qualified column references of the form  table.column
+_QUALIFIED_COL = re.compile(
+    r'\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b',
+    re.IGNORECASE,
+)
+
+# Matches  user_id = :user_id  with an optional table-name prefix.
+# Accepts both  habits.user_id = :user_id  and bare  user_id = :user_id .
+_USER_ID_FILTER = re.compile(
+    r'(?:[a-zA-Z_][a-zA-Z0-9_]*\.)?user_id\s*=\s*:user_id\b',
+    re.IGNORECASE,
+)
+
 
 class SqlValidationService:
     """Validates generated SQL against safety rules before execution.
@@ -82,6 +106,59 @@ class SqlValidationService:
             )
         return None
 
+    @staticmethod
+    def _check_no_table_aliases(sql: str) -> str | None:
+        """Return a rejection reason if the SQL declares a table alias.
+
+        Aggregate-expression aliases like  COUNT(*) AS n  are allowed because
+        the left side of AS contains a parenthesis.  Table aliases like
+        bottle_events AS be  are rejected.
+        """
+        for match in _TABLE_ALIAS.finditer(sql):
+            left_token = match.group(1)
+            # Find the full expression to the left of AS (look backwards from match start)
+            # Simple heuristic: if the character just before the left token (ignoring
+            # whitespace) is ')', this is an aggregate alias — allow it.
+            start = match.start()
+            prefix = sql[:start].rstrip()
+            if prefix.endswith(")"):
+                continue
+            return (
+                f"SQL uses a table alias ('{match.group(0)}'). "
+                "Write the full table name everywhere instead of aliasing it."
+            )
+        return None
+
+    def _check_known_columns(self, sql: str) -> str | None:
+        """Return a rejection reason if the SQL references an unknown table.column pair."""
+        column_set = self._schema_svc.schema.column_set
+        approved_tables = self._schema_svc.allowed_tables
+        unknown: list[str] = []
+        for match in _QUALIFIED_COL.finditer(sql):
+            tbl = match.group(1).lower()
+            col = match.group(2).lower()
+            if tbl not in {t.lower() for t in approved_tables}:
+                # Already caught by _check_allowed_tables; skip here.
+                continue
+            if (tbl, col) not in {(t.lower(), c.lower()) for t, c in column_set}:
+                unknown.append(f"{tbl}.{col}")
+        if unknown:
+            return (
+                f"SQL references column(s) that do not exist in the schema: "
+                f"{sorted(set(unknown))}."
+            )
+        return None
+
+    @staticmethod
+    def _check_user_id_filter(sql: str) -> str | None:
+        """Return a rejection reason if the SQL is missing a user_id filter."""
+        if not _USER_ID_FILTER.search(sql):
+            return (
+                "SQL is missing the required user_id filter. "
+                "Include  <table>.user_id = :user_id  in every WHERE clause."
+            )
+        return None
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def validate(self, sql: str) -> SqlValidationResult:
@@ -94,6 +171,9 @@ class SqlValidationService:
             self._check_single_statement,
             self._check_select_only,
             self._check_allowed_tables,
+            self._check_no_table_aliases,
+            self._check_known_columns,
+            self._check_user_id_filter,
         ):
             reason = check(sql)
             if reason:

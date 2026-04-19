@@ -29,6 +29,7 @@ from habittracker.schemas.sql_chat import (
     SqlValidationResult,
     ValidationStatus,
 )
+from habittracker.schemas.sql_template import SqlAnalyticsIntent
 from habittracker.services.sql.errors import SqlAnswerError, SqlExecutionError, SqlGenerationError
 from habittracker.services.sql.pipeline_service import SqlPipelineService, sql_pipeline_service
 
@@ -113,7 +114,19 @@ def _make_pipeline(
         validation_svc=validation_svc,
         execution_svc=execution_svc,
         answer_svc=answer_svc,
+        # Default to UNKNOWN so all existing tests flow through the LLM path
+        # unchanged; individual tests can override via a custom mock.
+        intent_classifier=_make_unknown_classifier(),
+        parameter_extractor=MagicMock(),
+        template_renderer=MagicMock(),
     )
+
+
+def _make_unknown_classifier() -> MagicMock:
+    """Return a mock intent classifier that always returns UNKNOWN."""
+    clf = MagicMock()
+    clf.classify.return_value = SqlAnalyticsIntent.UNKNOWN
+    return clf
 
 
 # ── Happy path ────────────────────────────────────────────────────────────────
@@ -186,6 +199,9 @@ class TestGenerationFailure:
             validation_svc=val_svc,
             execution_svc=exec_svc,
             answer_svc=answer_svc,
+            intent_classifier=_make_unknown_classifier(),
+            parameter_extractor=MagicMock(),
+            template_renderer=MagicMock(),
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -230,6 +246,9 @@ class TestValidationRejection:
             validation_svc=val_svc,
             execution_svc=exec_svc,
             answer_svc=answer_svc,
+            intent_classifier=_make_unknown_classifier(),
+            parameter_extractor=MagicMock(),
+            template_renderer=MagicMock(),
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -351,6 +370,9 @@ class TestAnswerStage:
             validation_svc=val_svc,
             execution_svc=exec_svc,
             answer_svc=answer_svc,
+            intent_classifier=_make_unknown_classifier(),
+            parameter_extractor=MagicMock(),
+            template_renderer=MagicMock(),
         )
         request = _make_request(question="How many habits?")
         svc.run(request, session=MagicMock())
@@ -369,6 +391,9 @@ class TestAnswerStage:
             validation_svc=val_svc,
             execution_svc=exec_svc,
             answer_svc=answer_svc,
+            intent_classifier=_make_unknown_classifier(),
+            parameter_extractor=MagicMock(),
+            template_renderer=MagicMock(),
         )
         svc.run(_make_request(), session=MagicMock())
         answer_svc.answer.assert_not_called()

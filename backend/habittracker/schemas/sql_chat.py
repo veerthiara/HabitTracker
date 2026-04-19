@@ -28,12 +28,21 @@ class SqlGenerationRequest(BaseModel):
     user_id: str = Field(..., description="UUID of the authenticated user; used to scope all queries.")
 
 
+class GenerationMethod(str, Enum):
+    TEMPLATE = "template"
+    LLM = "llm"
+
+
 class SqlGenerationResult(BaseModel):
     """Output from the SQL generation service."""
 
     sql: str = Field(..., description="Generated SQL text (SELECT only).")
     question: str = Field(..., description="Original question, carried forward for context.")
     user_id: str = Field(..., description="User ID, carried forward for execution scoping.")
+    generation_method: GenerationMethod = Field(
+        default=GenerationMethod.LLM,
+        description="Whether SQL was produced by a fixed template or free-form LLM generation.",
+    )
 
 
 # ── SQL validation ─────────────────────────────────────────────────────────────
@@ -102,4 +111,8 @@ class SqlPipelineResult(BaseModel):
     answer: str | None = Field(
         default=None,
         description="Natural-language answer generated from the execution rows. None when the pipeline did not reach the answer stage.",
+    )
+    generation_method: GenerationMethod | None = Field(
+        default=None,
+        description="How the SQL was produced: 'template' or 'llm'. None when generation did not complete.",
     )
