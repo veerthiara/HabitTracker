@@ -30,7 +30,7 @@ from habittracker.schemas.sql_chat import (
     ValidationStatus,
 )
 from habittracker.schemas.sql_template import SqlAnalyticsIntent
-from habittracker.services.sql.errors import SqlAnswerError, SqlExecutionError, SqlGenerationError
+from habittracker.services.sql.errors import SqlAnswerError, SqlExecutionError, SqlGenerationError, SqlRepairError
 from habittracker.services.sql.pipeline_service import SqlPipelineService, sql_pipeline_service
 
 
@@ -119,6 +119,7 @@ def _make_pipeline(
         intent_classifier=_make_unknown_classifier(),
         parameter_extractor=MagicMock(),
         template_renderer=MagicMock(),
+        repair_svc=_make_no_repair_svc(),
     )
 
 
@@ -127,6 +128,13 @@ def _make_unknown_classifier() -> MagicMock:
     clf = MagicMock()
     clf.classify.return_value = SqlAnalyticsIntent.UNKNOWN
     return clf
+
+
+def _make_no_repair_svc() -> MagicMock:
+    """Return a mock repair service that raises SqlRepairError (repair not needed by default)."""
+    svc = MagicMock()
+    svc.repair.side_effect = SqlRepairError("repair disabled in test")
+    return svc
 
 
 # ── Happy path ────────────────────────────────────────────────────────────────
@@ -202,6 +210,7 @@ class TestGenerationFailure:
             intent_classifier=_make_unknown_classifier(),
             parameter_extractor=MagicMock(),
             template_renderer=MagicMock(),
+            repair_svc=_make_no_repair_svc(),
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -249,6 +258,7 @@ class TestValidationRejection:
             intent_classifier=_make_unknown_classifier(),
             parameter_extractor=MagicMock(),
             template_renderer=MagicMock(),
+            repair_svc=_make_no_repair_svc(),
         )
         svc.run(_make_request(), session=MagicMock())
         exec_svc.execute.assert_not_called()
@@ -373,6 +383,7 @@ class TestAnswerStage:
             intent_classifier=_make_unknown_classifier(),
             parameter_extractor=MagicMock(),
             template_renderer=MagicMock(),
+            repair_svc=_make_no_repair_svc(),
         )
         request = _make_request(question="How many habits?")
         svc.run(request, session=MagicMock())
@@ -394,6 +405,7 @@ class TestAnswerStage:
             intent_classifier=_make_unknown_classifier(),
             parameter_extractor=MagicMock(),
             template_renderer=MagicMock(),
+            repair_svc=_make_no_repair_svc(),
         )
         svc.run(_make_request(), session=MagicMock())
         answer_svc.answer.assert_not_called()
@@ -414,3 +426,107 @@ class TestSingleton:
 
     def test_singleton_is_pipeline_service(self) -> None:
         assert isinstance(sql_pipeline_service, SqlPipelineService)
+
+
+# ── Repair loop (Rev 10) ──────────────────────────────────────────────────────
+
+
+def _make_pipeline_with_repair(
+    repaired_sql: str = _FAKE_SQL,
+    repair_raises: Exception | None = None,
+) -> SqlPipelineService:
+    """Build a pipeline where the first execution fails and repair is attempted."""
+    gen_svc = MagicMock()
+    gen_svc.generate.return_value = _make_generation_result()
+
+    val_svc = MagicMock()
+    # First validation (original SQL) passes; second validation (repaired SQL) also passes.
+    val_svc.validate.return_value = _make_ok_validation()
+
+    exec_svc = MagicMock()
+    # First execute raises; second execute succeeds.
+    exec_svc.execute.side_effect = [
+        SqlExecutionError("column does not exist"),
+        _make_execution_result(),
+    ]
+
+    answer_svc = MagicMock()
+    answer_svc.answer.return_value = "Repaired answer."
+
+    repair_svc = MagicMock()
+    if repair_raises is not None:
+        repair_svc.repair.side_effect = repair_raises
+    else:
+        repair_svc.repair.return_value = repaired_sql
+
+    return SqlPipelineService(
+        generation_svc=gen_svc,
+        validation_svc=val_svc,
+        execution_svc=exec_svc,
+        answer_svc=answer_svc,
+        intent_classifier=_make_unknown_classifier(),
+        parameter_extractor=MagicMock(),
+        template_renderer=MagicMock(),
+        repair_svc=repair_svc,
+    )
+
+
+class TestRepairLoop:
+
+    def test_repair_attempted_on_execution_failure(self) -> None:
+        svc = _make_pipeline_with_repair()
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.repair_attempted is True
+
+    def test_success_after_repair(self) -> None:
+        svc = _make_pipeline_with_repair()
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.success is True
+
+    def test_repair_error_is_none_on_success(self) -> None:
+        svc = _make_pipeline_with_repair()
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.repair_error is None
+
+    def test_repair_not_attempted_on_success(self) -> None:
+        # When first execution succeeds there should be no repair attempt.
+        svc = _make_pipeline(answer_result="ok")
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.repair_attempted is False
+
+    def test_repair_failure_returns_failure_result(self) -> None:
+        from habittracker.services.sql.errors import SqlRepairError
+        svc = _make_pipeline_with_repair(repair_raises=SqlRepairError("LLM unreachable"))
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.success is False
+        assert result.repair_attempted is True
+        assert result.repair_error is not None
+
+    def test_second_execution_failure_returns_failure_result(self) -> None:
+        gen_svc = MagicMock()
+        gen_svc.generate.return_value = _make_generation_result()
+        val_svc = MagicMock()
+        val_svc.validate.return_value = _make_ok_validation()
+        exec_svc = MagicMock()
+        # Both execute calls fail.
+        exec_svc.execute.side_effect = [
+            SqlExecutionError("first error"),
+            SqlExecutionError("second error"),
+        ]
+        answer_svc = MagicMock()
+        repair_svc = MagicMock()
+        repair_svc.repair.return_value = _FAKE_SQL
+        svc = SqlPipelineService(
+            generation_svc=gen_svc,
+            validation_svc=val_svc,
+            execution_svc=exec_svc,
+            answer_svc=answer_svc,
+            intent_classifier=_make_unknown_classifier(),
+            parameter_extractor=MagicMock(),
+            template_renderer=MagicMock(),
+            repair_svc=repair_svc,
+        )
+        result = svc.run(_make_request(), session=MagicMock())
+        assert result.success is False
+        assert result.repair_attempted is True
+        assert "second error" in result.repair_error

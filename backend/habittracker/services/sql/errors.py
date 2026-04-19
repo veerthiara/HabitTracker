@@ -45,3 +45,7 @@ class SqlTemplateError(SqlError):
 
 class SqlParameterExtractionError(SqlError):
     """Raised when the LLM fails to extract structured parameters from the question."""
+
+
+class SqlRepairError(SqlError):
+    """Raised when the repair LLM call fails or produces unusable SQL."""

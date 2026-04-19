@@ -42,12 +42,14 @@ from habittracker.services.sql.errors import (
     SqlExecutionError,
     SqlGenerationError,
     SqlParameterExtractionError,
+    SqlRepairError,
     SqlTemplateError,
 )
 from habittracker.services.sql.execution_service import SqlExecutionService, sql_execution_service
 from habittracker.services.sql.generation_service import SqlGenerationService, sql_generation_service
 from habittracker.services.sql.intent_classifier import SqlIntentClassifier, sql_intent_classifier
 from habittracker.services.sql.parameter_extractor import SqlParameterExtractor, sql_parameter_extractor
+from habittracker.services.sql.repair_service import SqlRepairService, sql_repair_service
 from habittracker.services.sql.template_renderer import SqlTemplateRenderer, sql_template_renderer
 from habittracker.services.sql.validation_service import SqlValidationService, sql_validation_service
 from habittracker.schemas.sql_template import SqlAnalyticsIntent
@@ -65,6 +67,10 @@ class SqlPipelineService:
       c) if UNKNOWN intent, or if template extraction/render fails →
          fall back to free-form LLM generation via SqlGenerationService
 
+    Stage 3 (execution) catches DB errors and attempts one repair pass
+    via SqlRepairService.  If the repaired SQL also fails, a safe fallback
+    message is returned to the user.
+
     Dependencies are injected so they can be easily swapped in tests.
     """
 
@@ -77,6 +83,7 @@ class SqlPipelineService:
         intent_classifier: SqlIntentClassifier,
         parameter_extractor: SqlParameterExtractor,
         template_renderer: SqlTemplateRenderer,
+        repair_svc: SqlRepairService,
     ) -> None:
         self._generation_svc = generation_svc
         self._validation_svc = validation_svc
@@ -85,6 +92,7 @@ class SqlPipelineService:
         self._intent_classifier = intent_classifier
         self._parameter_extractor = parameter_extractor
         self._template_renderer = template_renderer
+        self._repair_svc = repair_svc
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
@@ -170,22 +178,23 @@ class SqlPipelineService:
                 generation_method=generation_method,
             )
 
-        # ── Stage 3: execute ──────────────────────────────────────────────────
-        exec_request = SqlExecutionRequest(
+        # ── Stage 3: execute (with one-pass repair on failure) ────────────────
+        execution_result, repair_attempted, repair_error = self._execute_with_repair(
             sql=generated_sql,
-            user_id=request.user_id,
+            request=request,
+            session=session,
         )
-        try:
-            execution_result = self._execution_svc.execute(exec_request, session)
-        except SqlExecutionError as exc:
-            logger.warning("SQL execution failed: %s", exc)
+
+        if execution_result is None:
             return SqlPipelineResult(
                 question=request.question,
                 generated_sql=generated_sql,
                 validation=validation_result,
                 success=False,
-                failure_reason=f"SQL execution failed: {exc}",
+                failure_reason=repair_error or "SQL execution failed.",
                 generation_method=generation_method,
+                repair_attempted=repair_attempted,
+                repair_error=repair_error,
             )
 
         # ── Stage 4: answer ───────────────────────────────────────────────────
@@ -211,7 +220,64 @@ class SqlPipelineService:
             success=True,
             answer=answer_text,
             generation_method=generation_method,
+            repair_attempted=repair_attempted,
         )
+
+    # ── Private helpers ───────────────────────────────────────────────────────
+
+    def _execute_with_repair(
+        self,
+        sql: str,
+        request: SqlGenerationRequest,
+        session,
+    ) -> tuple:
+        """Attempt execution; on failure try one repair pass.
+
+        Returns:
+            (execution_result, repair_attempted, repair_error)
+            execution_result is None when both attempts failed.
+        """
+        exec_request = SqlExecutionRequest(sql=sql, user_id=request.user_id)
+        try:
+            return self._execution_svc.execute(exec_request, session), False, None
+        except SqlExecutionError as first_exc:
+            db_error = str(first_exc)
+            logger.warning("SQL execution failed (will attempt repair): %s", db_error)
+
+        # ── Repair attempt ────────────────────────────────────────────────────
+        try:
+            repaired_sql = self._repair_svc.repair(
+                question=request.question,
+                failed_sql=sql,
+                db_error=db_error,
+            )
+        except SqlRepairError as exc:
+            failure = f"SQL execution failed and repair was not possible: {exc}"
+            logger.warning("SQL repair failed: %s", exc)
+            return None, True, failure
+
+        # Validate the repaired SQL before re-executing
+        repair_validation = self._validation_svc.validate(repaired_sql)
+        if repair_validation.status == ValidationStatus.REJECTED:
+            failure = (
+                f"Repaired SQL was rejected by validator: "
+                f"{repair_validation.rejection_reason}"
+            )
+            logger.warning(failure)
+            return None, True, failure
+
+        repaired_exec = SqlExecutionRequest(sql=repaired_sql, user_id=request.user_id)
+        try:
+            result = self._execution_svc.execute(repaired_exec, session)
+            logger.info("SQL repair succeeded.")
+            return result, True, None
+        except SqlExecutionError as second_exc:
+            failure = (
+                f"SQL execution failed after repair attempt. "
+                f"Original: {db_error}. After repair: {second_exc}"
+            )
+            logger.warning(failure)
+            return None, True, failure
 
 
 # ── Module-level singleton ────────────────────────────────────────────────────
@@ -224,4 +290,5 @@ sql_pipeline_service = SqlPipelineService(
     intent_classifier=sql_intent_classifier,
     parameter_extractor=sql_parameter_extractor,
     template_renderer=sql_template_renderer,
+    repair_svc=sql_repair_service,
 )

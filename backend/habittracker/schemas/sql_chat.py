@@ -116,3 +116,11 @@ class SqlPipelineResult(BaseModel):
         default=None,
         description="How the SQL was produced: 'template' or 'llm'. None when generation did not complete.",
     )
+    repair_attempted: bool = Field(
+        default=False,
+        description="True when the repair loop was invoked after an execution failure.",
+    )
+    repair_error: str | None = Field(
+        default=None,
+        description="Reason the repair attempt failed, if repair_attempted=True and success=False.",
+    )
