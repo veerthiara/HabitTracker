@@ -1,0 +1,299 @@
+[
+  {
+    "id": "total_water_30d",
+    "question": "How much water did I drink in the last 30 days?",
+    "expected_intent": "total_metric",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "total_water_this_month",
+    "question": "What is the total amount of water I consumed this month?",
+    "expected_intent": "total_metric",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "total_habit_logs_30d",
+    "question": "How much in total have I logged habits in the past month?",
+    "expected_intent": "total_metric",
+    "template_params": {
+      "table": "habit_logs",
+      "metric_col": "id",
+      "ts_col": "logged_date",
+      "interval_days": 30
+    },
+    "expected_tables": ["habit_logs"],
+    "must_not_contain": [" AS T1", " AS T2", " AS hl", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "average_water_per_day_30d",
+    "question": "What is my average water intake per day over the last 30 days?",
+    "expected_intent": "average_per_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "average_water_daily_7d",
+    "question": "Tell me my daily average water intake for the past week",
+    "expected_intent": "average_per_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 7
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "average_per_day_mean",
+    "question": "What is the mean number of bottle events per day this month?",
+    "expected_intent": "average_per_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "count_bottle_events_7d",
+    "question": "How many bottle events did I log in the last 7 days?",
+    "expected_intent": "count_logs",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "id",
+      "ts_col": "event_ts",
+      "interval_days": 7
+    },
+    "expected_tables": ["bottle_events"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "count_habit_logs_30d",
+    "question": "How many habit log entries did I make in the past 30 days?",
+    "expected_intent": "count_logs",
+    "template_params": {
+      "table": "habit_logs",
+      "metric_col": "id",
+      "ts_col": "logged_date",
+      "interval_days": 30
+    },
+    "expected_tables": ["habit_logs"],
+    "must_not_contain": [" AS T1", " AS T2", " AS hl", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "count_logs_entries",
+    "question": "What is the total count of habit entries this week?",
+    "expected_intent": "count_logs",
+    "template_params": {
+      "table": "habit_logs",
+      "metric_col": "id",
+      "ts_col": "logged_date",
+      "interval_days": 7
+    },
+    "expected_tables": ["habit_logs"],
+    "must_not_contain": [" AS T1", " AS T2", " AS hl", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "daily_trend_water_7d",
+    "question": "Show me my water intake day by day for the last 7 days",
+    "expected_intent": "daily_trend",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 7
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "daily_trend_breakdown",
+    "question": "Give me a daily trend of my hydration over the past 30 days",
+    "expected_intent": "daily_trend",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "daily_trend_each_day",
+    "question": "Break down my bottle events each day this week",
+    "expected_intent": "daily_trend",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 7
+    },
+    "expected_tables": ["bottle_events"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "top_day_most_water",
+    "question": "Which day did I drink the most water?",
+    "expected_intent": "top_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "top_day_best_day",
+    "question": "What was my best day for hydration in the last 30 days?",
+    "expected_intent": "top_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "top_day_highest_volume",
+    "question": "Which date had the highest total volume?",
+    "expected_intent": "top_day",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 30
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "habit_completion_rate_30d",
+    "question": "What is my habit completion rate this month?",
+    "expected_intent": "habit_completion_rate",
+    "template_params": {
+      "table": "habit_logs",
+      "metric_col": "id",
+      "ts_col": "logged_date",
+      "interval_days": 30
+    },
+    "expected_tables": ["habit_logs"],
+    "must_not_contain": [" AS T1", " AS T2", " AS hl", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "habit_completion_rate_often",
+    "question": "How often did I complete my habits in the last 30 days?",
+    "expected_intent": "habit_completion_rate",
+    "template_params": {
+      "table": "habit_logs",
+      "metric_col": "id",
+      "ts_col": "logged_date",
+      "interval_days": 30
+    },
+    "expected_tables": ["habit_logs"],
+    "must_not_contain": [" AS T1", " AS T2", " AS hl", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "compare_water_this_vs_last_week",
+    "question": "Compare my water intake this week vs last week",
+    "expected_intent": "compare_periods",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 14
+    },
+    "expected_tables": ["bottle_events"],
+    "expected_columns": ["volume_ml"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "compare_periods_month",
+    "question": "Compare this month versus last month for bottle events",
+    "expected_intent": "compare_periods",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 14
+    },
+    "expected_tables": ["bottle_events"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "compare_periods_difference",
+    "question": "What is the difference between my hydration this week and last week?",
+    "expected_intent": "compare_periods",
+    "template_params": {
+      "table": "bottle_events",
+      "metric_col": "volume_ml",
+      "ts_col": "event_ts",
+      "interval_days": 14
+    },
+    "expected_tables": ["bottle_events"],
+    "must_not_contain": [" AS T1", " AS T2", " AS be", "JOIN users", "%(user_id)s"]
+  },
+  {
+    "id": "unknown_which_habit_missed",
+    "question": "Which habit do I miss most often?",
+    "expected_intent": "unknown",
+    "template_params": null,
+    "expected_tables": [],
+    "expected_columns": [],
+    "must_not_contain": []
+  },
+  {
+    "id": "unknown_weekday_pattern",
+    "question": "What weekday do I drink the most water?",
+    "expected_intent": "unknown",
+    "template_params": null,
+    "expected_tables": [],
+    "expected_columns": [],
+    "must_not_contain": []
+  },
+  {
+    "id": "unknown_habit_streak",
+    "question": "What is my longest streak for any habit?",
+    "expected_intent": "unknown",
+    "template_params": null,
+    "expected_tables": [],
+    "expected_columns": [],
+    "must_not_contain": []
+  }
+]

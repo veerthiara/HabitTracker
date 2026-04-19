@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build docs-install docs-run docs-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed langfuse-up langfuse-down langfuse-logs langfuse-ps langfuse-reset
+.PHONY: backend-install backend-run backend-health backend-docker-up backend-docker-down client-install client-run client-build docs-install docs-run docs-build local-db-up local-db-down local-db-reset local-db-logs local-db-ps local-db-check db-migrate db-downgrade db-revision db-history db-seed embed-notes test-embed langfuse-up langfuse-down langfuse-logs langfuse-ps langfuse-reset sql-eval
 
 backend-install:
 	cd backend && poetry install
@@ -79,6 +79,9 @@ test-embed:
 
 tests:
 	cd backend && poetry run pytest tests -v
+
+sql-eval:
+	cd backend && poetry run pytest tests/habittracker/services/sql/test_sql_eval.py -v
 
 # ── Langfuse (local observability) ────────────────────────────────────────────
 
