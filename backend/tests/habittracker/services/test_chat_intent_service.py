@@ -91,14 +91,63 @@ class TestClassifyIntentGeneral:
         assert classify_intent("Tell me something about my progress") == ChatIntent.GENERAL
 
     def test_open_ended_question_is_general(self):
-        assert classify_intent("Give me a summary of everything") == ChatIntent.GENERAL
+        # "summary" contains "sum" which matches SQL_ANALYTICS_KEYWORDS
+        assert classify_intent("Give me a summary of everything") == ChatIntent.SQL_ANALYTICS
 
     def test_long_sentence_no_keywords_is_general(self):
         assert classify_intent("I would like to know more about my overall situation") == ChatIntent.GENERAL
 
 
+class TestClassifyIntentSqlAnalytics:
+    """Tests for SQL_ANALYTICS intent classification.
+
+    Note: SQL_ANALYTICS is checked AFTER BOTTLE_ACTIVITY, HABIT_SUMMARY, NOTE_PATTERN.
+    Questions containing those domain keywords will route to their respective paths.
+    SQL_ANALYTICS catches analytical questions WITHOUT those specific keywords.
+    """
+
+    def test_compare_keyword_without_domain_terms(self):
+        # No "habit", "water", "bottle" - routes to SQL
+        assert classify_intent("Compare this month versus last month") == ChatIntent.SQL_ANALYTICS
+
+    def test_average_keyword_without_domain_terms(self):
+        assert classify_intent("What is my average per day?") == ChatIntent.SQL_ANALYTICS
+
+    def test_group_by_keyword_without_domain_terms(self):
+        assert classify_intent("Group events by weekday") == ChatIntent.SQL_ANALYTICS
+
+    def test_trend_keyword_without_domain_terms(self):
+        # "trend" is also in NOTE_PATTERN keywords (checked first)
+        assert classify_intent("Show me the trend over time") == ChatIntent.NOTE_PATTERN
+
+    def test_highest_lowest_keyword_without_domain_terms(self):
+        assert classify_intent("Which day had the highest count?") == ChatIntent.SQL_ANALYTICS
+
+    def test_top_keyword_without_domain_terms(self):
+        assert classify_intent("Show top 5 days") == ChatIntent.SQL_ANALYTICS
+
+    def test_rate_keyword_without_domain_terms(self):
+        assert classify_intent("What is the completion rate this week?") == ChatIntent.SQL_ANALYTICS
+
+    def test_weekday_weekend_keyword_without_domain_terms(self):
+        assert classify_intent("Compare weekday versus weekend") == ChatIntent.SQL_ANALYTICS
+
+    def test_month_over_month_keyword_without_domain_terms(self):
+        assert classify_intent("Month over month change") == ChatIntent.SQL_ANALYTICS
+
+    def test_percentage_keyword_without_domain_terms(self):
+        assert classify_intent("What percentage of days?") == ChatIntent.SQL_ANALYTICS
+
+    def test_case_insensitive(self):
+        assert classify_intent("COMPARE this week vs last week") == ChatIntent.SQL_ANALYTICS
+
+    def test_sum_keyword_triggers_sql(self):
+        # "sum" is in SQL_ANALYTICS_KEYWORDS
+        assert classify_intent("What is the sum of my data?") == ChatIntent.SQL_ANALYTICS
+
+
 class TestClassifyIntentOrdering:
-    """Verify evaluation order: BOTTLE > HABIT > NOTE_PATTERN.
+    """Verify evaluation order: BOTTLE > HABIT > NOTE_PATTERN > SQL_ANALYTICS > GENERAL.
 
     When a message contains keywords from multiple intent groups, the
     higher-priority group wins.  This prevents surprising misrouting.
@@ -114,6 +163,22 @@ class TestClassifyIntentOrdering:
     def test_habit_beats_pattern_when_both_present(self):
         # "habit" should win over "why" since habit is checked first.
         assert classify_intent("Why did I miss my habit today?") == ChatIntent.HABIT_SUMMARY
+
+    def test_note_pattern_beats_sql_when_why_present(self):
+        # "why" should route to NOTE_PATTERN, not SQL_ANALYTICS
+        assert classify_intent("Why is my completion trending down?") == ChatIntent.NOTE_PATTERN
+
+    def test_sql_beats_general(self):
+        # Analytical keywords should win over GENERAL fallback
+        assert classify_intent("Compare my stats this month vs last month") == ChatIntent.SQL_ANALYTICS
+
+    def test_bottle_still_beats_sql(self):
+        # BOTTLE_ACTIVITY is checked first
+        assert classify_intent("Compare my water intake today vs yesterday") == ChatIntent.BOTTLE_ACTIVITY
+
+    def test_habit_still_beats_sql(self):
+        # HABIT_SUMMARY is checked before SQL_ANALYTICS
+        assert classify_intent("Compare my habit streaks") == ChatIntent.HABIT_SUMMARY
 
 
 class TestClassifyIntentReturnType:

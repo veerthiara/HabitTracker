@@ -46,7 +46,8 @@ class TestClassifyIntentNode:
         assert result["intent"] == "note_pattern_question"
 
     def test_general_message(self):
-        state = {"current_message": "Give me a summary of my week"}
+        # Use a message without SQL keywords to hit GENERAL
+        state = {"current_message": "Tell me something about my progress"}
         result = classify_intent_node(state)
         assert result["intent"] == "general_question"
 

@@ -18,15 +18,17 @@ class ChatIntent(StrEnum):
     """Classified intent of a user chat message.
 
     Evaluation order in classify_intent() is:
-      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → GENERAL
+      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → SQL_ANALYTICS → GENERAL
 
     GENERAL is the fallback — any legitimate question that doesn't match
     a more specific intent still gets the best available answer.
     UNSUPPORTED is reserved for non-questions (greetings, acknowledgements).
+    SQL_ANALYTICS is for flexible analytical questions requiring dynamic SQL.
     """
 
     HABIT_SUMMARY = "habit_summary"
     BOTTLE_ACTIVITY = "bottle_activity"
     NOTE_PATTERN = "note_pattern_question"
+    SQL_ANALYTICS = "sql_analytics"
     GENERAL = "general_question"
     UNSUPPORTED = "unsupported"

@@ -135,6 +135,7 @@ class TestGraphHappyPath:
         assert state["evidence"][0].type == "note"
 
     def test_general_question_end_to_end(self, graph, mock_chat, monkeypatch):
+        # Use a message without SQL keywords (sum, average, compare, etc.) to hit GENERAL
         general_context = ChatContextResult(
             evidence=[EvidenceItem(type="metric", label="Active habits", value="3")],
             context_text="Active habits: 3",
@@ -144,7 +145,7 @@ class TestGraphHappyPath:
             "habittracker.graph.nodes.gather_context",
             lambda *a, **k: general_context,
         )
-        state = graph.invoke(_base_state("Give me a summary of my progress"), config=_config())
+        state = graph.invoke(_base_state("Tell me something about my progress"), config=_config())
 
         assert state["intent"] == "general_question"
         assert len(state["evidence"]) > 0

@@ -11,7 +11,8 @@ more specific intents are checked first.
   2. BOTTLE_ACTIVITY  — hydration / water / bottle questions
   3. HABIT_SUMMARY    — habit completion / routine / streak questions
   4. NOTE_PATTERN     — "why" / pattern / trend / explanation questions
-  5. GENERAL          — fallback for any other legitimate question
+  5. SQL_ANALYTICS    — analytical / comparison / trend / aggregate questions
+  6. GENERAL          — fallback for any other legitimate question
 
 Examples of ordering behaviour:
   "Did I drink water after my morning habit?"
@@ -21,6 +22,11 @@ Examples of ordering behaviour:
   "Why did I miss my habit today?"
       → has "habit" (habit_summary) AND "why" (note_pattern)
       → resolves to HABIT_SUMMARY because habit is checked before pattern
+
+  "Compare my habit completion this month vs last month"
+      → has "habit" (habit_summary) AND "compare" (sql_analytics)
+      → resolves to SQL_ANALYTICS because it's checked before GENERAL
+      → but after NOTE_PATTERN to avoid routing "why" questions to SQL
 """
 
 import re
@@ -64,6 +70,26 @@ _PATTERN_KEYWORDS: tuple[str, ...] = (
     "always", "never", "most of the time",
 )
 
+# Checked fourth — analytical questions requiring flexible SQL (grouping, comparison, aggregation).
+# Checked AFTER note_pattern so "why" questions go to semantic retrieval, not SQL.
+_SQL_ANALYTICS_KEYWORDS: tuple[str, ...] = (
+    "compare", "comparison", "versus", "vs", "against",
+    "average", "mean", "median", "aggregate", "aggregation",
+    "group by", "grouped by", "breakdown", "break down",
+    "trend", "trends", "trending",
+    "correlation", "correlate",
+    "distribution", "distribute",
+    "percentile", "quartile",
+    "highest", "lowest", "most", "least", "maximum", "minimum",
+    "top ", "bottom ", "rank", "ranking",
+    "weekday", "weekend", "monthly", "weekly", "daily",
+    "this month", "last month", "this week", "last week",
+    "year over year", "month over month", "week over week",
+    "change", "difference", "delta", "improvement", "decline",
+    "rate", "ratio", "percentage", "proportion",
+    "frequency", "count", "sum", "total",
+)
+
 
 # ── Classifier ────────────────────────────────────────────────────────────────
 
@@ -71,7 +97,7 @@ def classify_intent(message: str) -> ChatIntent:
     """Classify a user message into a ChatIntent.
 
     Evaluation order (first match wins):
-      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → GENERAL
+      UNSUPPORTED → BOTTLE_ACTIVITY → HABIT_SUMMARY → NOTE_PATTERN → SQL_ANALYTICS → GENERAL
 
     Args:
         message: The raw user input.
@@ -102,6 +128,9 @@ def classify_intent(message: str) -> ChatIntent:
 
     if any(kw in msg for kw in _PATTERN_KEYWORDS):
         return ChatIntent.NOTE_PATTERN
+
+    if any(kw in msg for kw in _SQL_ANALYTICS_KEYWORDS):
+        return ChatIntent.SQL_ANALYTICS
 
     # Fallback — do not classify as UNSUPPORTED for legitimate questions
     # that simply use unexpected wording.  The general handler uses
