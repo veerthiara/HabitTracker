@@ -4,7 +4,7 @@ Reusable Pydantic models for column, table, relationship, and catalog definition
 Zero dependencies on application-specific code.
 """
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Annotated
 
 
@@ -155,7 +155,7 @@ class SqlSchemaCatalog(BaseModel):
 
 # ── SQL Pipeline Contracts (behavior-free) ─────────────────────────────────────
 
-class SQLGenerationRequest(BaseModel):
+class SqlGenerationRequest(BaseModel):
     """Request to generate SQL from a natural-language question."""
 
     question: Annotated[str, Field(min_length=1, max_length=500)]
@@ -172,6 +172,14 @@ class GeneratedSql(BaseModel):
     referenced_columns: tuple[str, ...] = ()
     explanation: str | None = None
     confidence: float | None = None
+
+    @field_validator("sql")
+    @classmethod
+    def validate_sql_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("sql must not be empty")
+        return cleaned
 
     @model_validator(mode="after")
     def _validate_confidence(self) -> "GeneratedSql":
@@ -199,7 +207,7 @@ class SqlValidationResult(BaseModel):
     warnings: tuple[str, ...] = ()
 
 
-class SQLExecutionResult(BaseModel):
+class SqlExecutionResult(BaseModel):
     """Result of executing validated SQL."""
 
     success: bool

@@ -6,11 +6,11 @@ from habittracker.sql_analytics.contracts import (
     SqlTableDefinition,
     SqlRelationshipDefinition,
     SqlSchemaCatalog,
-    SQLGenerationRequest,
+    SqlGenerationRequest,
     GeneratedSql,
     SqlValidationError,
     SqlValidationResult,
-    SQLExecutionResult,
+    SqlExecutionResult,
     SqlEvidenceItem,
     SqlAnswerResult,
 )
@@ -385,7 +385,7 @@ class TestGeneratedSql:
 
 class TestContractsSerialization:
     def test_generation_request_serializes(self):
-        req = SQLGenerationRequest(
+        req = SqlGenerationRequest(
             question="How many orders?",
             user_id="123",
             schema_context="test context",
@@ -395,7 +395,7 @@ class TestContractsSerialization:
         assert data["question"] == "How many orders?"
 
     def test_generation_request_int_user_id(self):
-        req = SQLGenerationRequest(
+        req = SqlGenerationRequest(
             question="How many?",
             user_id=123,
             schema_context="ctx",
@@ -407,7 +407,7 @@ class TestContractsSerialization:
         assert err.code == "E001"
 
     def test_execution_result_serializes(self):
-        res = SQLExecutionResult(success=True, rows=( {"col1": "a", "col2": 1}, ), columns=("col1", "col2"), row_count=1)
+        res = SqlExecutionResult(success=True, rows=( {"col1": "a", "col2": 1}, ), columns=("col1", "col2"), row_count=1)
         assert res.success is True
         assert res.row_count == 1
 

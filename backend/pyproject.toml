@@ -3,7 +3,10 @@ name = "backend"
 version = "0.1.0"
 description = "FastAPI backend for the langchain-pgvector project"
 authors = ["Thiara, Veer (V.) <vthiara+ford@ford.com>"]
-package-mode = false
+package-mode = true
+packages = [
+    { include = "habittracker" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
