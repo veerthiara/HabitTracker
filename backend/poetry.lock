@@ -1863,6 +1863,18 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
+name = "sqlglot"
+version = "2.8.0"
+description = "An easily customizable SQL parser and transpiler"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "sqlglot-2.8.0-py3-none-any.whl", hash = "sha256:9ec149e0b55fdf6d53ca183624916ab8063863d65cd5c3cde7cf8a59c69d77d4"},
+    {file = "sqlglot-2.8.0.tar.gz", hash = "sha256:25689da55aef3b74fd0c9cdd382e5160a8e5e2dc9a1997baa4cfb279debe2fc8"},
+]
+
+[[package]]
 name = "starlette"
 version = "0.46.2"
 description = "The little ASGI library that shines."
@@ -2633,4 +2645,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "f979a6d2a10d20bd61d3eaeebbd06edf64c538775b58e3f7c7a71e260825ffb1"
+content-hash = "fe0d55919e870392513c2d19b6ae0b97d01f0c44cacb2c643d6a18819bd959e7"

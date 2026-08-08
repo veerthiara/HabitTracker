@@ -55,6 +55,8 @@ from habittracker.sql_analytics.generation import (
     SqlGenerationError,
     SqlGenerationResponseError,
 )
+from habittracker.sql_analytics.validation import SqlValidationService
+from habittracker.sql_analytics.exceptions import SqlValidationException, SqlParseError
 
 __all__ = [
     # Contracts
@@ -84,6 +86,10 @@ __all__ = [
     # Settings
     "SqlAnalyticsSettings",
     "get_settings",
+    # Validation
+    "SqlValidationService",
+    "SqlValidationException",
+    "SqlParseError",
 ]
 
 __version__ = "0.1.0"

@@ -195,6 +195,7 @@ class SqlValidationError(BaseModel):
     message: str
     line: int | None = None
     column: int | None = None
+    context: str | None = None
 
 
 class SqlValidationResult(BaseModel):
@@ -202,9 +203,19 @@ class SqlValidationResult(BaseModel):
 
     valid: bool
     normalized_sql: str | None = None
+    statement_type: str | None = None
     referenced_tables: tuple[str, ...] = ()
+    referenced_columns: tuple[str, ...] = ()
     errors: tuple[SqlValidationError, ...] = ()
     warnings: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_consistency(self) -> "SqlValidationResult":
+        if self.valid and self.errors:
+            raise ValueError("valid=True requires no errors")
+        if not self.valid and not self.errors:
+            raise ValueError("valid=False requires at least one error")
+        return self
 
 
 class SqlExecutionResult(BaseModel):
