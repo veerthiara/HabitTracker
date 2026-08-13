@@ -245,3 +245,33 @@ class SqlAnswerResult(BaseModel):
     evidence: tuple[SqlEvidenceItem, ...] = ()
     row_count: int = 0
     query_summary: str | None = None
+
+
+# ── Policy Validation Contracts (Rev 04) ─────────────────────────────────────────
+
+class SqlPolicyError(BaseModel):
+    """A single policy validation error."""
+
+    code: str
+    message: str
+    context: str | None = None
+
+
+class SqlPolicyValidationResult(BaseModel):
+    """Result of policy validation (user scope, result bounds)."""
+
+    valid: bool
+    normalized_sql: str | None = None
+    scoped_tables: tuple[str, ...] = ()
+    detected_parameters: tuple[str, ...] = ()
+    effective_limit: int | None = None
+    errors: tuple[SqlPolicyError, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_consistency(self) -> "SqlPolicyValidationResult":
+        if self.valid and self.errors:
+            raise ValueError("valid=True requires no errors")
+        if not self.valid and not self.errors:
+            raise ValueError("valid=False requires at least one error")
+        return self

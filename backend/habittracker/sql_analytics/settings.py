@@ -19,10 +19,17 @@ class SqlAnalyticsSettings(BaseModel):
     debug_responses: bool = False
     allow_note_content: bool = False
 
+    # Policy settings (Rev 04)
+    default_result_limit: int = Field(default=50, ge=1)
+    max_result_limit: int = Field(default=500, ge=1)
+    required_scope_parameter: str = "user_id"
+
     @model_validator(mode="after")
     def _validate_limits(self) -> "SqlAnalyticsSettings":
         if self.default_limit > self.max_rows:
             raise ValueError("default_limit must be <= max_rows")
+        if self.default_result_limit > self.max_result_limit:
+            raise ValueError("default_result_limit must be <= max_result_limit")
         return self
 
 
@@ -36,6 +43,10 @@ def _load_settings() -> SqlAnalyticsSettings:
         max_result_chars=int(os.getenv("SQL_QA_MAX_RESULT_CHARS", "20000")),
         debug_responses=os.getenv("SQL_QA_DEBUG_RESPONSES", "false").lower() == "true",
         allow_note_content=os.getenv("SQL_QA_ALLOW_NOTE_CONTENT", "false").lower() == "true",
+        # Policy settings (Rev 04)
+        default_result_limit=int(os.getenv("SQL_QA_DEFAULT_RESULT_LIMIT", "50")),
+        max_result_limit=int(os.getenv("SQL_QA_MAX_RESULT_LIMIT", "500")),
+        required_scope_parameter=os.getenv("SQL_QA_REQUIRED_SCOPE_PARAMETER", "user_id"),
     )
 
 

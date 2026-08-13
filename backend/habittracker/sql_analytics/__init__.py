@@ -57,6 +57,8 @@ from habittracker.sql_analytics.generation import (
 )
 from habittracker.sql_analytics.validation import SqlValidationService
 from habittracker.sql_analytics.exceptions import SqlValidationException, SqlParseError
+from habittracker.sql_analytics.policy import SqlPolicyValidationService
+from habittracker.sql_analytics.contracts import SqlPolicyValidationResult, SqlPolicyError
 
 __all__ = [
     # Contracts
@@ -71,6 +73,8 @@ __all__ = [
     "SqlExecutionResult",
     "SqlEvidenceItem",
     "SqlAnswerResult",
+    "SqlPolicyError",
+    "SqlPolicyValidationResult",
     # Catalog
     "SqlCatalogProvider",
     "StaticSqlCatalogProvider",
@@ -90,6 +94,8 @@ __all__ = [
     "SqlValidationService",
     "SqlValidationException",
     "SqlParseError",
+    # Policy
+    "SqlPolicyValidationService",
 ]
 
 __version__ = "0.1.0"
